@@ -14,15 +14,20 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.semanticweb.owlapi.reasoner.ReasonerInternalException;
 
+import conformance.Original;
+import conformance.PortedFrom;
+import uk.ac.manchester.cs.chainsaw.FastSet;
+import uk.ac.manchester.cs.chainsaw.FastSetFactory;
 import uk.ac.manchester.cs.jfact.kernel.DLDag;
 import uk.ac.manchester.cs.jfact.kernel.DagTag;
 import uk.ac.manchester.cs.jfact.kernel.MergableLabel;
 import uk.ac.manchester.cs.jfact.kernel.NamedEntry;
 import uk.ac.manchester.cs.jfact.kernel.Role;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /**
  * DL Vertex
@@ -32,24 +37,21 @@ import conformance.PortedFrom;
 @PortedFrom(file = "dlVertex.h", name = "DLVertex")
 public class DLVertex extends DLVertexTagDFS {
 
-    private static final long serialVersionUID = 11000L;
+    class ChildSet implements Comparator<Integer>, Serializable {
 
-    static class ChildSet implements Comparator<Integer>, Serializable {
-
-        private static final long serialVersionUID = 11000L;
-        protected final FastSet set = FastSetFactory.create();
+        protected final FastSet children = FastSetFactory.create();
         private final SortedIntList original = new SortedIntList();
         private int[] sorted = null;
         protected DLDag sorter = null;
 
         @Override
         @PortedFrom(file = "dlVertex.h", name = "compare")
-        public int compare(Integer o1, Integer o2) {
-            return sorter.compare(o1, o2);
+        public int compare(@Nullable Integer o1, @Nullable Integer o2) {
+            return sorter.compare(o1.intValue(), o2.intValue());
         }
 
         @Override
-        public boolean equals(Object arg0) {
+        public boolean equals(@Nullable Object arg0) {
             if (arg0 == null) {
                 return false;
             }
@@ -58,14 +60,14 @@ public class DLVertex extends DLVertexTagDFS {
             }
             if (arg0 instanceof ChildSet) {
                 ChildSet arg = (ChildSet) arg0;
-                return set.equals(arg.set);
+                return children.equals(arg.children);
             }
             return false;
         }
 
         @Override
         public int hashCode() {
-            return set.hashCode();
+            return children.hashCode();
         }
 
         public void setSorter(DLDag d) {
@@ -75,21 +77,21 @@ public class DLVertex extends DLVertexTagDFS {
 
         public int[] sorted() {
             if (sorted == null) {
-                sorted = new int[set.size()];
+                sorted = new int[children.size()];
                 if (sorter == null) {
-                    for (int i = 0; i < set.size(); i++) {
+                    for (int i = 0; i < children.size(); i++) {
                         // if there is no sorting, use the original insertion
                         // order
                         sorted[i] = original.get(i);
                     }
                 } else {
-                    List<Integer> l = new ArrayList<Integer>();
-                    for (int i = 0; i < set.size(); ++i) {
-                        l.add(set.get(i));
+                    List<Integer> l = new ArrayList<>();
+                    for (int i = 0; i < children.size(); ++i) {
+                        l.add(Integer.valueOf(children.get(i)));
                     }
                     Collections.sort(l, this);
                     for (int i = 0; i < sorted.length; ++i) {
-                        sorted[i] = l.get(i);
+                        sorted[i] = l.get(i).intValue();
                     }
                 }
             }
@@ -97,18 +99,16 @@ public class DLVertex extends DLVertexTagDFS {
         }
 
         public boolean contains(int inverse) {
-            return set.contains(inverse);
+            return children.contains(inverse);
         }
 
         public void clear() {
-            set.clear();
+            children.clear();
             sorted = null;
         }
 
         public boolean add(int p) {
-            int size = set.size();
-            set.add(p);
-            if (set.size() > size) {
+            if (children.add(p)) {
                 original.add(p);
                 sorted = null;
                 return true;
@@ -117,27 +117,65 @@ public class DLVertex extends DLVertexTagDFS {
         }
     }
 
-    /** set of arguments (CEs, numbers for NR) */
     @PortedFrom(file = "dlVertex.h", name = "Child")
+    /** set of arguments (CEs, numbers for NR) */
     private final ChildSet child = new ChildSet();
     /** pointer to concept-like entry (for PConcept, etc) */
-    @PortedFrom(file = "dlVertex.h", name = "Concept")
-    private NamedEntry concept = null;
+    @PortedFrom(file = "dlVertex.h", name = "Concept") private NamedEntry concept = null;
     /** pointer to role (for E\A, NR) */
-    @PortedFrom(file = "dlVertex.h", name = "Role")
-    private final Role role;
+    @PortedFrom(file = "dlVertex.h", name = "Role") private final Role role;
     /** projection role (used for projection op only) */
-    @PortedFrom(file = "dlVertex.h", name = "ProjRole")
-    private final Role projRole;
+    @PortedFrom(file = "dlVertex.h", name = "ProjRole") private final Role projRole;
     /** C if available */
-    @PortedFrom(file = "dlVertex.h", name = "C")
-    private int conceptIndex;
+    @PortedFrom(file = "dlVertex.h", name = "C") private int conceptIndex;
     /** n if available */
-    @PortedFrom(file = "dlVertex.h", name = "n")
-    private final int n;
+    @PortedFrom(file = "dlVertex.h", name = "n") private final int n;
     /** maximal depth, size and frequency of reference of the expression */
-    @PortedFrom(file = "dlVertex.h", name = "Sort")
-    private final MergableLabel sort = new MergableLabel();
+    @PortedFrom(file = "dlVertex.h", name = "Sort") private final MergableLabel sort = new MergableLabel();
+    private final DLDag heap;
+    /** maximal depth, size and frequency of reference of the expression */
+    @PortedFrom(file = "dlVertex.h", name = "stat") protected final int[] stat = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0 };
+    /** usage statistic for pos- and neg occurences of a vertex */
+    @PortedFrom(file = "dlVertex.h", name = "posUsage") protected final long posUsage = 0;
+    @PortedFrom(file = "dlVertex.h", name = "negUsage") protected final long negUsage = 0;
+
+    /**
+     * c'tor for Top/CN/And (before adding any operands)
+     * 
+     * @param op
+     *        op
+     * @param heap
+     *        heap
+     */
+    public DLVertex(DagTag op, DLDag heap) {
+        this(op, 0, null, BP_INVALID, null, heap);
+    }
+
+    /**
+     * c'tor for max n R_C; and for \A R{n}_C; Note order C, n, R.pointer
+     * 
+     * @param op
+     *        op
+     * @param m
+     *        m
+     * @param r
+     *        R
+     * @param c
+     *        c
+     * @param projR
+     *        ProjR
+     * @param heap
+     *        heap
+     */
+    public DLVertex(DagTag op, int m, @Nullable Role r, int c, @Nullable Role projR, DLDag heap) {
+        super(op);
+        role = r;
+        projRole = projR;
+        conceptIndex = c;
+        n = m;
+        this.heap = heap;
+    }
 
     /**
      * get RW access to the label
@@ -160,40 +198,8 @@ public class DLVertex extends DLVertexTagDFS {
         sort.merge(label);
     }
 
-    /**
-     * c'tor for Top/CN/And (before adding any operands)
-     * 
-     * @param op
-     *        op
-     */
-    public DLVertex(DagTag op) {
-        this(op, 0, null, bpINVALID, null);
-    }
-
-    /**
-     * c'tor for max n R_C; and for \A R{n}_C; Note order C, n, R.pointer
-     * 
-     * @param op
-     *        op
-     * @param m
-     *        m
-     * @param R
-     *        R
-     * @param c
-     *        c
-     * @param ProjR
-     *        ProjR
-     */
-    public DLVertex(DagTag op, int m, Role R, int c, Role ProjR) {
-        super(op);
-        role = R;
-        projRole = ProjR;
-        conceptIndex = c;
-        n = m;
-    }
-
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (obj == null) {
             return false;
         }
@@ -202,16 +208,21 @@ public class DLVertex extends DLVertexTagDFS {
         }
         if (obj instanceof DLVertex) {
             DLVertex v = (DLVertex) obj;
-            return op == v.op && compare(role, v.role)
-                    && compare(projRole, v.projRole)
-                    && conceptIndex == v.conceptIndex && n == v.n
-                    && child.equals(v.child);
+            return compareIndexes(v) && compareRoles(v) && child.equals(v.child);
         }
         return false;
     }
 
+    protected boolean compareIndexes(DLVertex v) {
+        return dagtag == v.dagtag && conceptIndex == v.conceptIndex && n == v.n;
+    }
+
+    protected boolean compareRoles(DLVertex v) {
+        return compare(role, v.role) && compare(projRole, v.projRole);
+    }
+
     @PortedFrom(file = "dlVertex.h", name = "compare")
-    private boolean compare(Object o1, Object o2) {
+    private static boolean compare(@Nullable Object o1, @Nullable Object o2) {
         if (o1 == null) {
             return o2 == null;
         }
@@ -220,55 +231,75 @@ public class DLVertex extends DLVertexTagDFS {
 
     @Override
     public int hashCode() {
-        return (op == null ? 0 : op.hashCode())
-                + (role == null ? 0 : role.hashCode())
-                + (projRole == null ? 0 : projRole.hashCode()) + conceptIndex
-                + n + (child == null ? 0 : child.hashCode());
+        int hash = dagtag == null ? 0 : dagtag.hashCode();
+        hash = 31 * hash + (role == null ? 0 : role.hashCode());
+        hash = 31 * hash + (projRole == null ? 0 : projRole.hashCode());
+        hash = 31 * hash + conceptIndex;
+        hash = 31 * hash + n;
+        hash = 31 * hash + (child == null ? 0 : child.hashCode());
+        return hash;
     }
 
-    /** @return C for concepts/quantifiers/NR verteces */
+    /**
+     * @return C for concepts/quantifiers/NR verteces
+     */
     @PortedFrom(file = "dlVertex.h", name = "getC")
     public int getConceptIndex() {
         return conceptIndex;
     }
 
-    /** @return N for the (max n R) vertex */
+    /**
+     * @return N for the (max n R) vertex
+     */
     @PortedFrom(file = "dlVertex.h", name = "getNumberLE")
     public int getNumberLE() {
         return n;
     }
 
-    /** @return N for the (min n R) vertex */
+    /**
+     * @return N for the (min n R) vertex
+     */
     @PortedFrom(file = "dlVertex.h", name = "getNumberGE")
     public int getNumberGE() {
         return n + 1;
     }
 
-    /** @return STATE for the (\all R{state}.C) vertex */
+    /**
+     * @return STATE for the (\all R{state}.C) vertex
+     */
     @PortedFrom(file = "dlVertex.h", name = "getState")
     public int getState() {
         return n;
     }
 
-    /** @return pointer to the first concept name of the entry */
+    /**
+     * @return pointer to the first concept name of the entry
+     */
     @PortedFrom(file = "dlVertex.h", name = "begin")
     public int[] begin() {
         return child.sorted();
     }
 
-    /** @return pointer to Role for the Role-like verteces */
+    /**
+     * @return pointer to Role for the Role-like verteces
+     */
     @PortedFrom(file = "dlVertex.h", name = "getRole")
     public Role getRole() {
         return role;
     }
 
-    /** @return pointer to Projection Role for the Projection verteces */
+    /**
+     * @return pointer to Projection Role for the Projection verteces
+     */
     @PortedFrom(file = "dlVertex.h", name = "getProjRole")
     public Role getProjRole() {
         return projRole;
     }
 
-    /** @return TConcept for concept-like fields */
+    /**
+     * @return TConcept for concept-like fields
+     */
+    @Nullable
     @PortedFrom(file = "dlVertex.h", name = "getConcept")
     public NamedEntry getConcept() {
         return concept;
@@ -303,37 +334,48 @@ public class DLVertex extends DLVertexTagDFS {
      */
     @PortedFrom(file = "dlVertex.h", name = "addChild")
     public boolean addChild(int p) {
-        if (p == bpTOP) {
+        // if adds to broken vertex -- do nothing
+        // if adding BOTTOM -- return clash (empty vertex) immediately
+        // this can happen in case of nested simplifications; see bNested1
+        if (dagtag == BAD || p == BP_BOTTOM) {
+            return true;
+        }
+        // if adds TOP -- nothing to do
+        if (p == BP_TOP) {
             return false;
         }
-        if (op == dtBad) {
-            return true;
-        }
-        if (p == bpBOTTOM) {
-            // clash:
-            child.clear();
-            op = dtBad;
-            return true;
+        if (child.contains(p)) {
+            return false;
         }
         if (child.contains(-p)) {
-            child.clear();
-            op = dtBad;
             return true;
         }
+        // XXX check this sorting:
+        // we need to insert p into set
+        // long offset = q - Child.begin();
+        // Child.push_back(Child.back());
+        // for (q_end = Child.begin()+offset, q = Child.end()-1; q != q_end;
+        // --q)
+        // *q=*(q-1); // copy the tail
+        // *q = p;
+        // // FIXME: add some simplification (about AR.C1, AR.c2 etc)
+        // return false;
         child.add(p);
         return false;
     }
 
-    /** @return andToDag */
+    /**
+     * @return andToDag
+     */
     @Original
     public int getAndToDagValue() {
-        if (child.set.size() == 0) {
-            return bpTOP;
+        if (child.children.size() == 0) {
+            return BP_TOP;
         }
-        if (child.set.size() == 1) {
-            return child.set.get(0);
+        if (child.children.size() == 1) {
+            return child.children.get(0);
         }
-        return bpINVALID;
+        return BP_INVALID;
     }
 
     /**
@@ -342,7 +384,7 @@ public class DLVertex extends DLVertexTagDFS {
      */
     @PortedFrom(file = "dlVertex.h", name = "sortEntry")
     public void sortEntry(DLDag dag) {
-        if (op != dtAnd) {
+        if (dagtag != AND) {
             return;
         }
         child.setSorter(dag);
@@ -356,85 +398,61 @@ public class DLVertex extends DLVertexTagDFS {
     public String toString(boolean extendedStats) {
         StringBuilder o = new StringBuilder();
         if (extendedStats) {
-            o.append("[d(");
-            o.append(stat[0]);
-            o.append('/');
-            o.append(stat[1]);
-            o.append("),s(");
-            o.append(stat[2]);
-            o.append('/');
-            o.append(stat[3]);
-            o.append("),b(");
-            o.append(stat[4]);
-            o.append('/');
-            o.append(stat[5]);
-            o.append("),g(");
-            o.append(stat[6]);
-            o.append('/');
-            o.append(stat[7]);
-            o.append("),f(");
-            o.append(stat[8]);
-            o.append('/');
-            o.append(stat[9]);
-            o.append(")] ");
+            o.append(String.format("[d(%s/%s),s(%s/%s),b(%s/%s),g(%s/%s),f(%s/%s)] ", Integer.toString(stat[0]),
+                Integer.toString(stat[1]), Integer.toString(stat[2]), Integer.toString(stat[3]),
+                Integer.toString(stat[4]), Integer.toString(stat[5]), Integer.toString(stat[6]),
+                Integer.toString(stat[7]), Integer.toString(stat[8]), Integer.toString(stat[9])));
         }
         o.append(toString());
         return o.toString();
     }
 
     @Override
+    @Nonnull
     public String toString() {
-        switch (op) {
-            case dtAnd:
-            case dtCollection:
-            case dtSplitConcept:
+        switch (dagtag) {
+            case AND:
+            case COLLECTION:
                 break;
-            case dtTop:
-            case dtNN:
-                return op.getName();
-            case dtDataExpr:
-                return op.getName() + ' ' + concept;
-            case dtDataValue:
-            case dtDataType:
-            case dtPConcept:
-            case dtNConcept:
-            case dtPSingleton:
-            case dtNSingleton:
-                return op.getName()
-                        + String.format(Templates.DLVERTEXPrint2.getTemplate(),
-                                concept.getName(),
-                                op.isNNameTag() ? "=" : "[=", conceptIndex);
-            case dtLE:
-                return op.getName() + ' ' + n + ' ' + role.getName() + ' '
-                        + conceptIndex;
-            case dtForall:
-                return op.getName()
-                        + String.format(Templates.DLVERTEXPrint3.getTemplate(),
-                                role.getName(), n, conceptIndex);
-            case dtIrr:
-                return op.getName() + ' ' + role.getName();
-            case dtProj:
-                return op.getName()
-                        + String.format(Templates.DLVERTEXPrint4.getTemplate(),
-                                role.getName(), conceptIndex,
-                                projRole.getName());
-            case dtChoose:
-                return op.getName() + ' ' + getConceptIndex();
+            case TOP:
+            case NN:
+                return dagtag.getName();
+            case DATAEXPR:
+                return dagtag.getName() + ' ' + concept;
+            case DATAVALUE:
+            case DATATYPE:
+            case PCONCEPT:
+            case NCONCEPT:
+            case PSINGLETON:
+            case NSINGLETON:
+                return dagtag.getName() + String.format(Templates.DLVERTEXPRINT2.getTemplate(), concept.getIRI(),
+                    dagtag.isNNameTag() ? "=" : "[=", concept);
+            case LE:
+                return dagtag.getName() + ' ' + n + ' ' + role.getIRI() + ' ' + concept;
+            case FORALL:
+                return dagtag.getName() + String.format(Templates.DLVERTEXPRINT3.getTemplate(), role.getIRI(),
+                    Integer.toString(n), concept);
+            case IRR:
+                return dagtag.getName() + ' ' + role.getIRI();
+            case PROJ:
+                return dagtag.getName()
+                    + String.format(Templates.DLVERTEXPRINT4.getTemplate(), role.getIRI(), concept, projRole.getIRI());
+            case CHOOSE:
+                return dagtag.getName() + ' ' + concept;
             default:
-                throw new ReasonerInternalException(String.format(
-                        "Error printing vertex of type %s(%s)", op.getName(),
-                        op));
+                throw new ReasonerInternalException(
+                    String.format("Error printing vertex of type %s(%s)", dagtag.getName(), dagtag));
         }
-        StringBuilder o = new StringBuilder(op.getName());
+        return childrenToString();
+    }
+
+    protected String childrenToString() {
+        StringBuilder o = new StringBuilder(dagtag.getName());
         for (int q : child.sorted()) {
-            o.append(' ').append(q);
+            o.append(' ').append(heap.get(q));
         }
         return o.toString();
     }
-
-    /** maximal depth, size and frequency of reference of the expression */
-    @PortedFrom(file = "dlVertex.h", name = "stat")
-    protected final int[] stat = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     /**
      * add-up all stat values at once by explicit values
@@ -452,7 +470,7 @@ public class DLVertex extends DLVertexTagDFS {
      */
     @PortedFrom(file = "dlVertex.h", name = "updateStatValues")
     public void updateStatValues(int d, int s, int b, int g, boolean pos) {
-        StatIndex.updateStatValues(d, s, b, g, pos, stat);
+        StatIndex.updateStatValues(d, s, b, g, pos, stat, false);
     }
 
     /**
@@ -467,7 +485,7 @@ public class DLVertex extends DLVertexTagDFS {
      */
     @PortedFrom(file = "dlVertex.h", name = "updateStatValues")
     public void updateStatValues(DLVertex v, boolean posV, boolean pos) {
-        StatIndex.updateStatValues(v, posV, pos, stat);
+        StatIndex.updateStatValues(v, posV, pos, stat, false);
     }
 
     /**
@@ -505,12 +523,6 @@ public class DLVertex extends DLVertexTagDFS {
     public int getDepth(boolean pos) {
         return StatIndex.getDepth(pos, stat);
     }
-
-    /** usage statistic for pos- and neg occurences of a vertex */
-    @PortedFrom(file = "dlVertex.h", name = "posUsage")
-    protected final long posUsage = 0;
-    @PortedFrom(file = "dlVertex.h", name = "negUsage")
-    protected final long negUsage = 0;
 
     /**
      * get access to a usage wrt POS

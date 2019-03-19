@@ -10,16 +10,14 @@ import java.io.Serializable;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.vocab.OWLRDFVocabulary;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.PortedFrom;
 
 /** bottom */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptBottom")
 public class ConceptBottom implements ConceptExpression, Serializable {
-
-    private static final long serialVersionUID = 11000L;
 
     @Override
     @PortedFrom(file = "tDLExpression.h", name = "accept")
@@ -35,11 +33,25 @@ public class ConceptBottom implements ConceptExpression, Serializable {
 
     @Override
     public String toString() {
-        return getName().toString();
+        return getIRI().toString();
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return OWLRDFVocabulary.OWL_NOTHING.getIRI();
+    }
+    @Override
+    public int hashCode() {
+        return 0;
+    }
+    @Override
+    public boolean equals(Object obj) {
+     if(obj==null) {
+         return false;
+     }
+     if(this==obj) {
+         return true;
+     }
+     return obj instanceof ConceptBottom;
     }
 }

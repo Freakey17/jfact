@@ -10,10 +10,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-/** class to represent the TS's */
-public class ToldSubsumers extends KnownSubsumers {
+import javax.annotation.Nullable;
 
-    private static final long serialVersionUID = 11000L;
+/** class to represent the TS's */
+public class ToldSubsumers implements KnownSubsumers {
+
     /** two iterators for the TS of a concept */
     private final List<ClassifiableEntry> beg;
 
@@ -21,20 +22,24 @@ public class ToldSubsumers extends KnownSubsumers {
      * @param b
      *        b
      */
-    public ToldSubsumers(Collection<ClassifiableEntry> b) {
-        beg = new ArrayList<ClassifiableEntry>(b);
+    public ToldSubsumers(@Nullable Collection<ClassifiableEntry> b) {
+        if (b != null) {
+        beg = new ArrayList<>(b);
+        } else {
+            beg = Collections.emptyList();
+        }
     }
 
     /** begin of the Sure subsumers interval */
     @Override
-    public List<ClassifiableEntry> s_begin() {
+    public List<ClassifiableEntry> sure() {
         return beg;
     }
 
     /** end of the Sure subsumers interval */
     /** begin of the Possible subsumers interval */
     @Override
-    public List<ClassifiableEntry> p_begin() {
+    public List<ClassifiableEntry> possible() {
         return Collections.emptyList();
     }
 }

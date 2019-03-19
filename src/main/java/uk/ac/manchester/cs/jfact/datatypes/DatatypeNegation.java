@@ -1,18 +1,18 @@
 package uk.ac.manchester.cs.jfact.datatypes;
 
-/* This file is part of the JFact DL reasoner
- Copyright 2011-2013 by Ignazio Palmisano, Dmitry Tsarkov, University of Manchester
- This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
- This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
+import static org.semanticweb.owlapi.util.OWLAPIStreamUtils.asList;
+
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.semanticweb.owlapi.model.IRI;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
@@ -23,19 +23,18 @@ import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
  * @param <R>
  *        type
  */
-public class DatatypeNegation<R extends Comparable<R>> implements
-        DatatypeExpression<R>, Serializable {
+public class DatatypeNegation<R extends Comparable<R>> implements DatatypeExpression<R>, Serializable {
 
-    private static final long serialVersionUID = 11000L;
-    private final Datatype<R> host;
-    private final IRI uri;
+    private static final Logger LOGGER = LoggerFactory.getLogger(DatatypeNegation.class);
+    @Nonnull private final Datatype<R> host;
+    @Nonnull private final IRI uri;
 
     /**
      * @param d
      *        d
      */
     public DatatypeNegation(Datatype<R> d) {
-        this.uri = IRI.create("urn:neg" + DatatypeFactory.getIndex());
+        this.uri = DatatypeFactory.getIndex("urn:neg").getIRI();
         host = d;
     }
 
@@ -93,13 +92,13 @@ public class DatatypeNegation<R extends Comparable<R>> implements
         return host.getKnownNonNumericFacetValues();
     }
 
+    @Nullable
     @Override
-    public <O extends Comparable<O>> O getFacetValue(Facet<O> f) {
-        O o = host.getFacetValue(f);
-        return o;
+    public Comparable getFacetValue(Facet f) {
+        return host.getFacetValue(f);
     }
 
-    @SuppressWarnings("rawtypes")
+    @Nullable
     @Override
     public Comparable getNumericFacetValue(Facet f) {
         return host.getNumericFacetValue(f);
@@ -171,15 +170,7 @@ public class DatatypeNegation<R extends Comparable<R>> implements
 
     @Override
     public Collection<Literal<R>> listValues() {
-        List<Literal<R>> toReturn = new ArrayList<Literal<R>>(host.listValues());
-        for (int i = 0; i < toReturn.size();) {
-            if (host.isCompatible(toReturn.get(i))) {
-                toReturn.remove(i);
-            } else {
-                i++;
-            }
-        }
-        return toReturn;
+        return asList(host.listValues().stream().filter(p -> !host.isCompatible(p)));
     }
 
     @Override
@@ -189,7 +180,7 @@ public class DatatypeNegation<R extends Comparable<R>> implements
 
     @Override
     public NumericDatatype<R> asNumericDatatype() {
-        return new NumericDatatypeWrapper<R>(this);
+        return new NumericDatatypeWrapper<>(this);
     }
 
     @Override
@@ -204,6 +195,7 @@ public class DatatypeNegation<R extends Comparable<R>> implements
     }
 
     @Override
+    @Nonnull
     public String toString() {
         return uri + "{" + host + '}';
     }
@@ -214,22 +206,23 @@ public class DatatypeNegation<R extends Comparable<R>> implements
     }
 
     @Override
-    public DatatypeExpression<R> addNumericFacet(Facet f, Comparable<?> value) {
-        System.out
-                .println("DatatypeNegation.addFacet() Cannot add a facet to a negation; modify the base type and rebuild a new negation. Returning the same object");
+    public DatatypeExpression<R> addNumericFacet(Facet f, @Nullable Comparable<?> value) {
+        LOGGER.warn(
+            "DatatypeNumericEnumeration.addFacet() WARNING: cannot add facets to a negation; returning the same object: {}",
+            this);
         return this;
     }
 
     @Override
-    public DatatypeExpression<R>
-            addNonNumericFacet(Facet f, Comparable<?> value) {
-        System.out
-                .println("DatatypeNegation.addFacet() Cannot add a facet to a negation; modify the base type and rebuild a new negation. Returning the same object");
+    public DatatypeExpression<R> addNonNumericFacet(Facet f, @Nullable Comparable<?> value) {
+        LOGGER.warn(
+            "DatatypeNumericEnumeration.addFacet() WARNING: cannot add facets to a negation; returning the same object: {}",
+            this);
         return this;
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return IRI.create(toString());
     }
 }

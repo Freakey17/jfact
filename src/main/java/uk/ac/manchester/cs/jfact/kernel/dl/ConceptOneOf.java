@@ -10,12 +10,12 @@ import java.util.List;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.IndividualExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.NAryExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.PortedFrom;
 
 /**
  * object nominal
@@ -24,11 +24,8 @@ import conformance.PortedFrom;
  *        type
  */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptOneOf")
-public class ConceptOneOf<I extends IndividualExpression> extends
-        NAryExpressionImpl<I> implements NAryExpression<I>, ConceptExpression,
-        Serializable {
-
-    private static final long serialVersionUID = 11000L;
+public class ConceptOneOf<I extends IndividualExpression> extends NAryExpressionImpl<I>
+    implements NAryExpression<I>, ConceptExpression, Serializable {
 
     /**
      * create one-of from individuals in the given array
@@ -53,7 +50,7 @@ public class ConceptOneOf<I extends IndividualExpression> extends
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return IRI.create(toString());
     }
 }

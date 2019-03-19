@@ -5,10 +5,14 @@ package uk.ac.manchester.cs.jfact.kernel;
  This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
  This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
+import static uk.ac.manchester.cs.jfact.kernel.ExpressionManager.*;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.helpers.DLVertex;
 import uk.ac.manchester.cs.jfact.helpers.Helper;
 import uk.ac.manchester.cs.jfact.helpers.UnreachableSituationException;
@@ -16,25 +20,33 @@ import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.Expression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.RoleExpression;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** class to translate DAG entities into the TDL* expressions */
 @PortedFrom(file = "tDag2Interface.h", name = "TDag2Interface")
 public class TDag2Interface implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** DAG to be translated */
-    @PortedFrom(file = "tDag2Interface.h", name = "Dag")
-    private final DLDag Dag;
+    @PortedFrom(file = "tDag2Interface.h", name = "Dag") private final DLDag dag;
     /** expression manager */
-    @PortedFrom(file = "tDag2Interface.h", name = "Manager")
-    private final ExpressionManager Manager;
+    @PortedFrom(file = "tDag2Interface.h", name = "Manager") private final ExpressionCache cache;
     /** vector of cached expressions */
-    @PortedFrom(file = "tDag2Interface.h", name = "TransC")
-    private final List<ConceptExpression> TransConcept = new ArrayList<ConceptExpression>();
-    @PortedFrom(file = "tDag2Interface.h", name = "TransD")
-    private final List<DataExpression> TransData = new ArrayList<DataExpression>();
+    @PortedFrom(file = "tDag2Interface.h", name = "TransC") private final List<ConceptExpression> transConcept = new ArrayList<>();
+    @PortedFrom(file = "tDag2Interface.h", name = "TransD") private final List<DataExpression> transData = new ArrayList<>();
+
+    /**
+     * init c'tor
+     * 
+     * @param dag
+     *        dag
+     * @param manager
+     *        manager
+     */
+    public TDag2Interface(DLDag dag, ExpressionCache manager) {
+        this.dag = dag;
+        cache = manager;
+        Helper.resize(transConcept, dag.size(), null);
+        Helper.resize(transData, dag.size(), null);
+    }
 
     /**
      * @param v
@@ -42,53 +54,45 @@ public class TDag2Interface implements Serializable {
      * @return build concept expression by a vertex V
      */
     @PortedFrom(file = "tDag2Interface.h", name = "buildCExpr")
+    @SuppressWarnings("incomplete-switch")
     public ConceptExpression buildCExpr(DLVertex v) {
         switch (v.getType()) {
-            case dtTop:
-                return Manager.top();
-            case dtNConcept:
-            case dtPConcept:
-                return Manager.concept(v.getConcept().getName());
-            case dtPSingleton:
-            case dtNSingleton:
-                return Manager.oneOf(Manager.individual(v.getConcept()
-                        .getName()));
-            case dtAnd:
-            case dtCollection:
-                List<ConceptExpression> list = new ArrayList<ConceptExpression>();
+            case TOP:
+                return top();
+            case NCONCEPT:
+            case PCONCEPT:
+                return cache.concept(v.getConcept().getEntity().getEntity());
+            case PSINGLETON:
+            case NSINGLETON:
+                return cache.oneOf(cache.individual(v.getConcept().getEntity().getEntity()));
+            case AND:
+            case COLLECTION:
+                List<ConceptExpression> list = new ArrayList<>();
                 for (int p : v.begin()) {
                     list.add(getCExpr(p));
                 }
-                return Manager.and(list);
-            case dtForall:
+                return and(list);
+            case FORALL:
                 if (v.getRole().isDataRole()) {
-                    return Manager.forall(
-                            Manager.dataRole(v.getRole().getName()),
-                            getDExpr(v.getConceptIndex()));
+                    return forall(cache.dataRole(v.getRole().getEntity().getEntity()), getDExpr(v.getConceptIndex()));
                 } else {
-                    return Manager.forall(
-                            Manager.objectRole(v.getRole().getName()),
-                            getCExpr(v.getConceptIndex()));
+                    return forall(cache.objectRole(v.getRole().getEntity().getEntity()), getCExpr(v.getConceptIndex()));
                 }
-            case dtLE:
+            case LE:
                 if (v.getRole().isDataRole()) {
-                    return Manager.maxCardinality(v.getNumberLE(),
-                            Manager.dataRole(v.getRole().getName()),
-                            getDExpr(v.getConceptIndex()));
+                    return maxCardinality(v.getNumberLE(), cache.dataRole(v.getRole().getEntity().getEntity()),
+                        getDExpr(v.getConceptIndex()));
                 } else {
-                    return Manager.maxCardinality(v.getNumberLE(),
-                            Manager.objectRole(v.getRole().getName()),
-                            getCExpr(v.getConceptIndex()));
+                    return maxCardinality(v.getNumberLE(), cache.objectRole(v.getRole().getEntity().getEntity()),
+                        getCExpr(v.getConceptIndex()));
                 }
-            case dtIrr:
-                return Manager.not(Manager.selfReference(Manager.objectRole(v
-                        .getRole().getName())));
-            case dtProj:
-            case dtNN:
-            case dtChoose:
-            case dtSplitConcept:
+            case IRR:
+                return not(selfReference(cache.objectRole(v.getRole().getEntity().getEntity())));
+            case PROJ:
+            case NN:
+            case CHOOSE:
                 // these are artificial constructions and shouldn't be visible
-                return Manager.top();
+                return top();
             default:
                 throw new UnreachableSituationException();
         }
@@ -100,39 +104,25 @@ public class TDag2Interface implements Serializable {
      * @return build data expression by a vertex V
      */
     @PortedFrom(file = "tDag2Interface.h", name = "buildDExpr")
+    @SuppressWarnings("incomplete-switch")
     public DataExpression buildDExpr(DLVertex v) {
         switch (v.getType()) {
-            case dtTop:
-                return Manager.dataTop();
-            case dtDataType:
-            case dtDataValue:
-            case dtDataExpr: // TODO: no data stuff yet
-                return Manager.dataTop();
-            case dtAnd:
-            case dtCollection:
-                List<DataExpression> list = new ArrayList<DataExpression>();
+            case TOP:
+                return dataTop();
+            case DATATYPE:
+            case DATAVALUE:
+            case DATAEXPR: // TODO: no data stuff yet
+                return dataTop();
+            case AND:
+            case COLLECTION:
+                List<DataExpression> list = new ArrayList<>();
                 for (int p : v.begin()) {
                     list.add(getDExpr(p));
                 }
-                return Manager.dataAnd(list);
+                return dataAnd(list);
             default:
                 throw new UnreachableSituationException();
         }
-    }
-
-    /**
-     * init c'tor
-     * 
-     * @param dag
-     *        dag
-     * @param manager
-     *        manager
-     */
-    public TDag2Interface(DLDag dag, ExpressionManager manager) {
-        Dag = dag;
-        Manager = manager;
-        Helper.resize(TransConcept, dag.size());
-        Helper.resize(TransData, dag.size());
     }
 
     /**
@@ -142,7 +132,7 @@ public class TDag2Interface implements Serializable {
      */
     @Original
     public RoleExpression getDataRoleExpression(Role r) {
-        return Manager.dataRole(r.getName());
+        return cache.dataRole(r.getEntity().getEntity());
     }
 
     /**
@@ -152,18 +142,20 @@ public class TDag2Interface implements Serializable {
      */
     @Original
     public RoleExpression getObjectRoleExpression(Role r) {
-        return Manager.objectRole(r.getName());
+        return cache.objectRole(r.getEntity().getEntity());
     }
 
-    /** make sure that size of expression cache is the same as the size of a DAG */
+    /**
+     * make sure that size of expression cache is the same as the size of a DAG
+     */
     @PortedFrom(file = "tDag2Interface.h", name = "ensureDagSize")
     public void ensureDagSize() {
-        int ds = Dag.size(), ts = TransConcept.size();
+        int ds = dag.size(), ts = transConcept.size();
         if (ds == ts) {
             return;
         }
-        Helper.resize(TransConcept, ds);
-        Helper.resize(TransData, ds);
+        Helper.resize(transConcept, ds, null);
+        Helper.resize(transData, ds, null);
     }
 
     /**
@@ -174,12 +166,12 @@ public class TDag2Interface implements Serializable {
     @PortedFrom(file = "tDag2Interface.h", name = "getCExpr")
     public ConceptExpression getCExpr(int p) {
         if (p < 0) {
-            return Manager.not(getCExpr(-p));
+            return not(getCExpr(-p));
         }
-        if (TransConcept.get(p) == null) {
-            TransConcept.set(p, buildCExpr(Dag.get(p)));
+        if (transConcept.get(p) == null) {
+            transConcept.set(p, buildCExpr(dag.get(p)));
         }
-        return TransConcept.get(p);
+        return transConcept.get(p);
     }
 
     /**
@@ -190,12 +182,12 @@ public class TDag2Interface implements Serializable {
     @PortedFrom(file = "tDag2Interface.h", name = "getDExpr")
     public DataExpression getDExpr(int p) {
         if (p < 0) {
-            return Manager.dataNot(getDExpr(-p));
+            return dataNot(getDExpr(-p));
         }
-        DataExpression expression = TransData.get(p);
+        DataExpression expression = transData.get(p);
         if (expression == null) {
-            expression = buildDExpr(Dag.get(p));
-            TransData.set(p, expression);
+            expression = buildDExpr(dag.get(p));
+            transData.set(p, expression);
         }
         return expression;
     }

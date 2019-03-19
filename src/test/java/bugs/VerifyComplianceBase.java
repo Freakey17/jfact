@@ -1,29 +1,29 @@
 package bugs;
 
-import static org.junit.Assert.assertEquals;
+import static java.util.stream.Collectors.joining;
+import static org.junit.Assert.*;
 
-import java.util.Arrays;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.stream.Stream;
+
+import javax.annotation.Nonnull;
 
 import org.junit.Before;
-import org.semanticweb.owlapi.apibinding.OWLManager;
-import org.semanticweb.owlapi.io.OWLFunctionalSyntaxOntologyFormat;
+import org.semanticweb.owlapi.formats.FunctionalSyntaxDocumentFormat;
 import org.semanticweb.owlapi.io.StringDocumentSource;
 import org.semanticweb.owlapi.io.SystemOutDocumentTarget;
+import org.semanticweb.owlapi.model.HasIRI;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.model.OWLClass;
-import org.semanticweb.owlapi.model.OWLDataFactory;
 import org.semanticweb.owlapi.model.OWLDataProperty;
 import org.semanticweb.owlapi.model.OWLEntity;
 import org.semanticweb.owlapi.model.OWLNamedIndividual;
+import org.semanticweb.owlapi.model.OWLObject;
 import org.semanticweb.owlapi.model.OWLObjectProperty;
 import org.semanticweb.owlapi.model.OWLOntology;
 import org.semanticweb.owlapi.model.OWLOntologyCreationException;
 import org.semanticweb.owlapi.model.OWLOntologyStorageException;
-import org.semanticweb.owlapi.profiles.OWL2DLProfile;
 import org.semanticweb.owlapi.profiles.OWLProfileReport;
-import org.semanticweb.owlapi.profiles.OWLProfileViolation;
+import org.semanticweb.owlapi.profiles.Profiles;
 import org.semanticweb.owlapi.reasoner.InferenceType;
 import org.semanticweb.owlapi.reasoner.Node;
 import org.semanticweb.owlapi.reasoner.NodeSet;
@@ -38,51 +38,34 @@ public abstract class VerifyComplianceBase extends TestBase {
     protected abstract String input();
 
     protected JFactReasoner reasoner;
-    protected OWLDataFactory df = OWLManager.getOWLDataFactory();
 
     protected OWLOntology load(String in) throws OWLOntologyCreationException {
-        OWLOntology onto = OWLManager.createOWLOntologyManager()
-                .loadOntologyFromOntologyDocument(
-                        VerifyComplianceBase.class.getResourceAsStream(in));
-        OWLProfileReport checkOntology = new OWL2DLProfile()
-                .checkOntology(onto);
+        OWLOntology onto = m.loadOntologyFromOntologyDocument(VerifyComplianceBase.class.getResourceAsStream(in));
+        OWLProfileReport checkOntology = Profiles.OWL2_DL.checkOntology(onto);
         if (!checkOntology.isInProfile()) {
-            for (OWLProfileViolation v : checkOntology.getViolations()) {
-                System.out.println("VerifyComplianceBase.load() " + v);
-            }
+            checkOntology.getViolations().forEach(System.out::println);
         }
         return onto;
     }
 
-    protected OWLOntology loadFromString(String in)
-            throws OWLOntologyCreationException {
-        return OWLManager.createOWLOntologyManager()
-                .loadOntologyFromOntologyDocument(new StringDocumentSource(in));
+    protected OWLOntology loadFromString(String in) throws OWLOntologyCreationException {
+        return m.loadOntologyFromOntologyDocument(new StringDocumentSource(in));
     }
 
-    protected static String set(Iterable<OWLEntity> i) {
-        Set<String> s = new TreeSet<String>();
-        for (OWLEntity e : i) {
-            s.add(e.getIRI().getFragment());
-        }
-        return s.toString().replace("[", "").replace("]", "")
-                .replace(", ", "\n");
+    protected static String set(Stream<? extends OWLObject> i) {
+        return i.sorted().map(e -> ((HasIRI) e).getIRI().getShortForm()).collect(joining("\n"));
     }
 
-    @SuppressWarnings({ "unchecked" })
-    protected void equal(NodeSet<?> node, OWLEntity... objects) {
-        assertEquals(set(Arrays.asList(objects)),
-                set((Set<OWLEntity>) node.getFlattened()));
+    protected static void equal(NodeSet<? extends OWLObject> node, OWLEntity... objects) {
+        assertEquals(set(Stream.of(objects)), set(node.entities()));
     }
 
-    @SuppressWarnings("unchecked")
-    protected void equal(Node<?> node, OWLEntity... objects) {
-        assertEquals(set(Arrays.asList(objects)),
-                set((Set<OWLEntity>) node.getEntities()));
+    protected static void equal(Node<? extends OWLObject> node, OWLEntity... objects) {
+        assertEquals(set(Stream.of(objects)), set(node.entities()));
     }
 
-    protected static void equal(Object o, boolean object) {
-        assertEquals(object, o);
+    protected static void equal(boolean o, boolean object) {
+        assertTrue(object == o);
     }
 
     protected OWLClass C(String i) {
@@ -101,20 +84,21 @@ public abstract class VerifyComplianceBase extends TestBase {
         return df.getOWLDataProperty(IRI.create(i));
     }
 
-    protected OWLDataProperty bottomDataProperty = df
-            .getOWLBottomDataProperty();
-    protected OWLDataProperty topDataProperty = df.getOWLTopDataProperty();
-    protected OWLObjectProperty topObjectProperty = df
-            .getOWLTopObjectProperty();
-    protected OWLObjectProperty bottomObjectProperty = df
-            .getOWLBottomObjectProperty();
-    protected OWLClass owlThing = df.getOWLThing();
-    protected OWLClass owlNothing = df.getOWLNothing();
+    @Nonnull protected OWLDataProperty bottomDataProperty = df.getOWLBottomDataProperty();
+    @Nonnull protected OWLDataProperty topDataProperty = df.getOWLTopDataProperty();
+    @Nonnull protected OWLObjectProperty topObjectProperty = df.getOWLTopObjectProperty();
+    @Nonnull protected OWLObjectProperty bottomObjectProperty = df.getOWLBottomObjectProperty();
+    @Nonnull protected OWLClass owlThing = df.getOWLThing();
+    @Nonnull protected OWLClass owlNothing = df.getOWLNothing();
+    protected JFactReasonerConfiguration config = new JFactReasonerConfiguration();
+
+    protected void enableLogging() {
+        config = config.setAbsorptionLoggingActive(true).setLoggingActive(true);
+    }
 
     @Before
     public void setUp() throws OWLOntologyCreationException {
-        reasoner = (JFactReasoner) factory().createReasoner(load(input()),
-                new JFactReasonerConfiguration());
+        reasoner = (JFactReasoner) factory().createReasoner(load(input()), config);
         reasoner.precomputeInferences(InferenceType.CLASS_HIERARCHY);
     }
 
@@ -125,9 +109,8 @@ public abstract class VerifyComplianceBase extends TestBase {
     protected void print() {
         OWLOntology o = reasoner.getRootOntology();
         try {
-            o.getOWLOntologyManager().saveOntology(o,
-                    new OWLFunctionalSyntaxOntologyFormat(),
-                    new SystemOutDocumentTarget());
+            o.getOWLOntologyManager().saveOntology(o, new FunctionalSyntaxDocumentFormat(),
+                new SystemOutDocumentTarget());
         } catch (OWLOntologyStorageException e) {
             e.printStackTrace();
         }

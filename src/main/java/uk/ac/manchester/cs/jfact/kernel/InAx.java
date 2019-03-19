@@ -10,15 +10,43 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import uk.ac.manchester.cs.jfact.helpers.DLTree;
 import conformance.PortedFrom;
+import uk.ac.manchester.cs.jfact.helpers.DLTree;
 
 /** DLTREE utils */
 @PortedFrom(file = "tAxiom.h", name = "InAx")
 public class InAx implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
+    /** statistics */
+    public static final String S_ABS_N_ATTEMPT = "SAbsNAttempt";
+    /** statistics */
+    public static final String S_ABS_N_APPLY = "SAbsNApply";
+    /** statistics */
+    public static final String S_ABS_ACTION = "SAbsAction";
+    /** statistics */
+    public static final String S_ABS_INPUT = "SAbsInput";
+    /** statistics */
+    public static final String S_ABS_R_ATTEMPT = "SAbsRAttempt";
+    /** statistics */
+    public static final String S_ABS_R_APPLY = "SAbsRApply";
+    /** statistics */
+    public static final String S_ABS_C_ATTEMPT = "SAbsCAttempt";
+    /** statistics */
+    public static final String S_ABS_C_APPLY = "SAbsCApply";
+    /** statistics */
+    public static final String S_ABS_T_APPLY = "SAbsTApply";
+    /** statistics */
+    public static final String S_ABS_SPLIT = "SAbsSplit";
+    /** statistics */
+    public static final String S_ABS_B_APPLY = "SAbsBApply";
+    /** statistics */
+    public static final String S_ABS_REP_FORALL = "SAbsRepForall";
+    /** statistics */
+    public static final String S_ABS_REP_CN = "SAbsRepCN";
+    private static final AtomicInteger ZERO = new AtomicInteger(0);
+    private final Map<String, AtomicInteger> created = new HashMap<>();
 
     /**
      * @return an RW concept from a given [C|I]NAME-rooted DLTree
@@ -30,37 +58,35 @@ public class InAx implements Serializable {
     }
 
     /**
-     * @param C
+     * @param c
      *        concept
-     * @param t
-     *        tbox
      * @return true if a concept C is a concept is non-primitive
      */
     @PortedFrom(file = "tAxiom.cpp", name = "isNP")
-    public static boolean isNP(Concept C, TBox t) {
-        return C.isNonPrimitive() && !hasDefCycle(C);
+    public static boolean isNP(Concept c) {
+        return c.isNonPrimitive() && !hasDefCycle(c);
     }
 
     @PortedFrom(file = "tAxiom.cpp", name = "hasDefCycle")
-    static boolean hasDefCycle(Concept C) {
-        if (C.isPrimitive()) {
+    static boolean hasDefCycle(Concept c) {
+        if (c.isPrimitive()) {
             return false;
         }
-        return hasDefCycle(C, new HashSet<Concept>());
+        return hasDefCycle(c, new HashSet<Concept>());
     }
 
     @PortedFrom(file = "tAxiom.cpp", name = "hasDefCycle")
-    static boolean hasDefCycle(Concept C, Set<Concept> visited) {
+    static boolean hasDefCycle(Concept c, Set<Concept> visited) {
         // interested in non-primitive
-        if (C.isPrimitive()) {
+        if (c.isPrimitive()) {
             return false;
         }
         // already seen -- cycle
-        if (visited.contains(C)) {
+        if (visited.contains(c)) {
             return true;
         }
         // check the structure: looking for the \exists R.C
-        DLTree p = C.getDescription();
+        DLTree p = c.getDescription();
         if (!p.isNOT()) {
             return false;
         }
@@ -78,7 +104,7 @@ public class InAx implements Serializable {
         }
         // here P is a concept
         // remember C
-        visited.add(C);
+        visited.add(c);
         // check p
         return hasDefCycle(getConcept(p), visited);
     }
@@ -113,12 +139,10 @@ public class InAx implements Serializable {
     /**
      * @param p
      *        the tree
-     * @param t
-     *        tbox
      * @return true iff P is a positive non-primitive CN
      */
-    public static boolean isPosNP(DLTree p, TBox t) {
-        return isPosCN(p) && isNP(getConcept(p.getChild()), t);
+    public static boolean isPosNP(DLTree p) {
+        return isPosCN(p) && isNP(getConcept(p.getChild()));
     }
 
     /**
@@ -142,12 +166,10 @@ public class InAx implements Serializable {
     /**
      * @param p
      *        the tree
-     * @param t
-     *        tbox
      * @return true iff P is a negative non-primitive CN
      */
-    public static boolean isNegNP(DLTree p, TBox t) {
-        return isNegCN(p) && isNP(getConcept(p), t);
+    public static boolean isNegNP(DLTree p) {
+        return isNegCN(p) && isNP(getConcept(p));
     }
 
     /**
@@ -192,8 +214,7 @@ public class InAx implements Serializable {
      *        the tree
      */
     public static boolean isOForall(DLTree p) {
-        return isForall(p)
-                && !Role.resolveRole(p.getChild().getLeft()).isDataRole();
+        return isForall(p) && !Role.resolveRole(p.getChild().getLeft()).isDataRole();
     }
 
     /**
@@ -205,25 +226,19 @@ public class InAx implements Serializable {
         if (!isOForall(p)) {
             return false;
         }
-        DLTree C = p.getChild().getRight();
-        if (isTop(C)) {
+        DLTree c = p.getChild().getRight();
+        if (isTop(c)) {
             return false;
         }
-        return !C.isName() || !getConcept(C).isSystem();
+        return !c.isName() || !getConcept(c).isSystem();
     }
-
-    private static final Map<String, Integer> created = new HashMap<String, Integer>();
 
     /**
      * @param s
      *        s
      */
-    private static void add(String s) {
-        if (created.containsKey(s)) {
-            created.put(s, created.get(s) + 1);
-        } else {
-            created.put(s, 1);
-        }
+    private void add(String s) {
+        created.computeIfAbsent(s, x -> new AtomicInteger()).incrementAndGet();
     }
 
     /**
@@ -231,203 +246,255 @@ public class InAx implements Serializable {
      *        s
      * @return index for s
      */
-    private static int get(String s) {
-        return created.containsKey(s) ? created.get(s) : 0;
+    private int get(String s) {
+        return created.getOrDefault(s, ZERO).intValue();
     }
 
     /** init SAbsRepCN */
-    public static void SAbsRepCN() {
-        add("SAbsRepCN");
+    public void sAbsRepCN() {
+        add(S_ABS_REP_CN);
     }
 
     /** init SAbsRepForall */
-    public static void SAbsRepForall() {
-        add("SAbsRepForall");
+    public void sAbsRepForall() {
+        add(S_ABS_REP_FORALL);
     }
 
     /** init SAbsBApply */
-    public static void SAbsBApply() {
-        add("SAbsBApply");
+    public void sAbsBApply() {
+        add(S_ABS_B_APPLY);
     }
 
     /** init SAbsSplit */
-    public static void SAbsSplit() {
-        add("SAbsSplit");
+    public void sAbsSplit() {
+        add(S_ABS_SPLIT);
     }
 
     /** init SAbsTApply */
-    public static void SAbsTApply() {
-        add("SAbsTApply");
+    public void sAbsTApply() {
+        add(S_ABS_T_APPLY);
     }
 
     /** init SAbsCApply */
-    public static void SAbsCApply() {
-        add("SAbsCApply");
+    public void sAbsCApply() {
+        add(S_ABS_C_APPLY);
     }
 
     /** init SAbsCAttempt */
-    public static void SAbsCAttempt() {
-        add("SAbsCAttempt");
+    public void sAbsCAttempt() {
+        add(S_ABS_C_ATTEMPT);
     }
 
     /** init SAbsRApply */
-    public static void SAbsRApply() {
-        add("SAbsRApply");
+    public void sAbsRApply() {
+        add(S_ABS_R_APPLY);
     }
 
     /** init SAbsRAttempt */
-    public static void SAbsRAttempt() {
-        add("SAbsRAttempt");
+    public void sAbsRAttempt() {
+        add(S_ABS_R_ATTEMPT);
     }
 
     /** init SAbsInput */
-    public static void SAbsInput() {
-        add("SAbsInput");
+    public void sAbsInput() {
+        add(S_ABS_INPUT);
     }
 
     /** init SAbsAction */
-    public static void SAbsAction() {
-        add("SAbsAction");
+    public void sAbsAction() {
+        add(S_ABS_ACTION);
     }
 
     /** init SAbsNApply */
-    public static void SAbsNApply() {
-        add("SAbsNApply");
+    public void sAbsNApply() {
+        add(S_ABS_N_APPLY);
     }
 
     /** init SAbsNAttempt */
-    public static void SAbsNAttempt() {
-        add("SAbsNAttempt");
+    public void sAbsNAttempt() {
+        add(S_ABS_N_ATTEMPT);
     }
 
-    /** @return true if map contains SAbsRepCN */
-    public static boolean containsSAbsRepCN() {
-        return created.containsKey("SAbsRepCN");
+    /**
+     * @return true if map contains SAbsRepCN
+     */
+    public boolean containsSAbsRepCN() {
+        return created.containsKey(S_ABS_REP_CN);
     }
 
-    /** @return true if map contains SAbsRepForall */
-    public static boolean containsSAbsRepForall() {
-        return created.containsKey("SAbsRepForall");
+    /**
+     * @return true if map contains SAbsRepForall
+     */
+    public boolean containsSAbsRepForall() {
+        return created.containsKey(S_ABS_REP_FORALL);
     }
 
-    /** @return true if map contains SAbsBApply */
-    public static boolean containsSAbsBApply() {
-        return created.containsKey("SAbsBApply");
+    /**
+     * @return true if map contains SAbsBApply
+     */
+    public boolean containsSAbsBApply() {
+        return created.containsKey(S_ABS_B_APPLY);
     }
 
-    /** @return true if map contains SAbsSplit */
-    public static boolean containsSAbsSplit() {
-        return created.containsKey("SAbsSplit");
+    /**
+     * @return true if map contains SAbsSplit
+     */
+    public boolean containsSAbsSplit() {
+        return created.containsKey(S_ABS_SPLIT);
     }
 
-    /** @return true if map contains SAbsTApply */
-    public static boolean containsSAbsTApply() {
-        return created.containsKey("SAbsTApply");
+    /**
+     * @return true if map contains SAbsTApply
+     */
+    public boolean containsSAbsTApply() {
+        return created.containsKey(S_ABS_T_APPLY);
     }
 
-    /** @return true if map contains SAbsCApply */
-    public static boolean containsSAbsCApply() {
-        return created.containsKey("SAbsCApply");
+    /**
+     * @return true if map contains SAbsCApply
+     */
+    public boolean containsSAbsCApply() {
+        return created.containsKey(S_ABS_C_APPLY);
     }
 
-    /** @return true if map contains SAbsCAttempt */
-    public static boolean containsSAbsCAttempt() {
-        return created.containsKey("SAbsCAttempt");
+    /**
+     * @return true if map contains SAbsCAttempt
+     */
+    public boolean containsSAbsCAttempt() {
+        return created.containsKey(S_ABS_C_ATTEMPT);
     }
 
-    /** @return true if map contains SAbsRApply */
-    public static boolean containsSAbsRApply() {
-        return created.containsKey("SAbsRApply");
+    /**
+     * @return true if map contains SAbsRApply
+     */
+    public boolean containsSAbsRApply() {
+        return created.containsKey(S_ABS_R_APPLY);
     }
 
-    /** @return true if map contains SAbsRAttempt */
-    public static boolean containsSAbsRAttempt() {
-        return created.containsKey("SAbsRAttempt");
+    /**
+     * @return true if map contains SAbsRAttempt
+     */
+    public boolean containsSAbsRAttempt() {
+        return created.containsKey(S_ABS_R_ATTEMPT);
     }
 
-    /** @return true if map contains SAbsInput */
-    public static boolean containsSAbsInput() {
-        return created.containsKey("SAbsInput");
+    /**
+     * @return true if map contains SAbsInput
+     */
+    public boolean containsSAbsInput() {
+        return created.containsKey(S_ABS_INPUT);
     }
 
-    /** @return true if map contains SAbsAction */
-    public static boolean containsSAbsAction() {
-        return created.containsKey("SAbsAction");
+    /**
+     * @return true if map contains SAbsAction
+     */
+    public boolean containsSAbsAction() {
+        return created.containsKey(S_ABS_ACTION);
     }
 
-    /** @return true if map contains SAbsNApply */
-    public static boolean containsSAbsNApply() {
-        return created.containsKey("SAbsNApply");
+    /**
+     * @return true if map contains SAbsNApply
+     */
+    public boolean containsSAbsNApply() {
+        return created.containsKey(S_ABS_N_APPLY);
     }
 
-    /** @return true if map contains SAbsNAttempt */
-    public static boolean containsSAbsNAttempt() {
-        return created.containsKey("SAbsNAttempt");
+    /**
+     * @return true if map contains SAbsNAttempt
+     */
+    public boolean containsSAbsNAttempt() {
+        return created.containsKey(S_ABS_N_ATTEMPT);
     }
 
-    /** @return value for SAbsRepCN */
-    public static int getSAbsRepCN() {
-        return get("SAbsRepCN");
+    /**
+     * @return value for SAbsRepCN
+     */
+    public int getSAbsRepCN() {
+        return get(S_ABS_REP_CN);
     }
 
-    /** @return value for SAbsRepForall */
-    public static int getSAbsRepForall() {
-        return get("SAbsRepForall");
+    /**
+     * @return value for SAbsRepForall
+     */
+    public int getSAbsRepForall() {
+        return get(S_ABS_REP_FORALL);
     }
 
-    /** @return value for SAbsBApply */
-    public static int getSAbsBApply() {
-        return get("SAbsBApply");
+    /**
+     * @return value for SAbsBApply
+     */
+    public int getSAbsBApply() {
+        return get(S_ABS_B_APPLY);
     }
 
-    /** @return value for SAbsSplit */
-    public static int getSAbsSplit() {
-        return get("SAbsSplit");
+    /**
+     * @return value for SAbsSplit
+     */
+    public int getSAbsSplit() {
+        return get(S_ABS_SPLIT);
     }
 
-    /** @return value for SAbsTApply */
-    public static int getSAbsTApply() {
-        return get("SAbsTApply");
+    /**
+     * @return value for SAbsTApply
+     */
+    public int getSAbsTApply() {
+        return get(S_ABS_T_APPLY);
     }
 
-    /** @return value for SAbsCApply */
-    public static int getSAbsCApply() {
-        return get("SAbsCApply");
+    /**
+     * @return value for SAbsCApply
+     */
+    public int getSAbsCApply() {
+        return get(S_ABS_C_APPLY);
     }
 
-    /** @return value for SAbsCAttempt */
-    public static int getSAbsCAttempt() {
-        return get("SAbsCAttempt");
+    /**
+     * @return value for SAbsCAttempt
+     */
+    public int getSAbsCAttempt() {
+        return get(S_ABS_C_ATTEMPT);
     }
 
-    /** @return value for SAbsRApply */
-    public static int getSAbsRApply() {
-        return get("SAbsRApply");
+    /**
+     * @return value for SAbsRApply
+     */
+    public int getSAbsRApply() {
+        return get(S_ABS_R_APPLY);
     }
 
-    /** @return value for SAbsRAttempt */
-    public static int getSAbsRAttempt() {
-        return get("SAbsRAttempt");
+    /**
+     * @return value for SAbsRAttempt
+     */
+    public int getSAbsRAttempt() {
+        return get(S_ABS_R_ATTEMPT);
     }
 
-    /** @return value for SAbsInput */
-    public static int getSAbsInput() {
-        return get("SAbsInput");
+    /**
+     * @return value for SAbsInput
+     */
+    public int getSAbsInput() {
+        return get(S_ABS_INPUT);
     }
 
-    /** @return value for SAbsAction */
-    public static int getSAbsAction() {
-        return get("SAbsAction");
+    /**
+     * @return value for SAbsAction
+     */
+    public int getSAbsAction() {
+        return get(S_ABS_ACTION);
     }
 
-    /** @return value for SAbsNApply */
-    public static int getSAbsNApply() {
-        return get("SAbsNApply");
+    /**
+     * @return value for SAbsNApply
+     */
+    public int getSAbsNApply() {
+        return get(S_ABS_N_APPLY);
     }
 
-    /** @return value for SAbsNAttempt */
-    public static int getSAbsNAttempt() {
-        return get("SAbsNAttempt");
+    /**
+     * @return value for SAbsNAttempt
+     */
+    public int getSAbsNAttempt() {
+        return get(S_ABS_N_ATTEMPT);
     }
 
     /**
@@ -441,9 +508,8 @@ public class InAx implements Serializable {
         if (!isAbsForall(p)) {
             return false;
         }
-        DLTree C = p.getChild().getRight();
+        DLTree c = p.getChild().getRight();
         // forall is simple if its filler is a name of a primitive concept
-        // XXX check
-        return C.isName() && getConcept(C).getDescription() == null;
+        return c.isName() && getConcept(c).getDescription() == null;
     }
 }

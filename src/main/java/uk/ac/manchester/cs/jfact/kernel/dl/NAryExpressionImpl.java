@@ -10,9 +10,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import javax.annotation.Nonnull;
+
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.Expression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.NAryExpression;
-import conformance.PortedFrom;
 
 /**
  * nary expression base
@@ -21,42 +23,35 @@ import conformance.PortedFrom;
  *        argument type
  */
 @PortedFrom(file = "tDLExpression.h", name = "TDLNAryExpression")
-public class NAryExpressionImpl<A extends Expression> implements
-        NAryExpression<A>, Serializable {
+public class NAryExpressionImpl<A extends Expression> implements NAryExpression<A>, Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** set of equivalent concept descriptions */
-    private final List<A> Base = new ArrayList<A>();
-
-    /** default constructor */
-    public NAryExpressionImpl() {}
+    private final List<A> base = new ArrayList<>();
 
     @Override
     public void add(Collection<A> v) {
-        for (Expression e : v) {
-            add(e);
-        }
+        v.forEach(this::add);
     }
 
     @Override
     public void add(Expression p) {
-        Base.add(transform(p));
+        base.add(transform(p));
     }
 
     @Override
     public List<A> getArguments() {
-        return Base;
+        return base;
     }
 
     @Override
     @PortedFrom(file = "tDLAxiom.h", name = "empty")
     public boolean isEmpty() {
-        return Base.isEmpty();
+        return base.isEmpty();
     }
 
     @Override
     public int size() {
-        return Base.size();
+        return base.size();
     }
 
     /** transform general expression into the argument one */
@@ -67,7 +62,8 @@ public class NAryExpressionImpl<A extends Expression> implements
     }
 
     @Override
+    @Nonnull
     public String toString() {
-        return "NAryExpression(" + Base + ')';
+        return "NAryExpression(" + base + ')';
     }
 }

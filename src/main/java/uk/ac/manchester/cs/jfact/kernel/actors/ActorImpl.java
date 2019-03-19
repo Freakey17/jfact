@@ -1,54 +1,26 @@
 package uk.ac.manchester.cs.jfact.kernel.actors;
 
-/* This file is part of the JFact DL reasoner
- Copyright 2011-2013 by Ignazio Palmisano, Dmitry Tsarkov, University of Manchester
- This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
- This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
-import java.io.Serializable;
+import static org.semanticweb.owlapi.util.OWLAPIStreamUtils.*;
+
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.ClassifiableEntry;
 import uk.ac.manchester.cs.jfact.kernel.Concept;
 import uk.ac.manchester.cs.jfact.kernel.TaxonomyVertex;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** @author ignazio */
 @Original
-public class ActorImpl implements Actor, Serializable {
+public class ActorImpl extends TaxGatheringWalker {
 
-    private static final long serialVersionUID = 11000L;
-    /** vertices that satisfy the condition */
-    @PortedFrom(file = "Actor.h", name = "found")
-    protected final List<TaxonomyVertex> found = new ArrayList<TaxonomyVertex>();
     /** flag to look at concept-like or role-like entities */
-    @PortedFrom(file = "Actor.h", name = "isRole")
-    protected boolean isRole;
+    @PortedFrom(file = "Actor.h", name = "isRole") protected boolean isRole;
     /** flag to look at concepts or object roles */
-    @PortedFrom(file = "Actor.h", name = "isStandard")
-    protected boolean isStandard;
+    @PortedFrom(file = "Actor.h", name = "isStandard") protected boolean isStandard;
     /** flag to throw exception at the 1st found */
-    @PortedFrom(file = "Actor.h", name = "interrupt")
-    protected boolean interrupt;
-
-    @Override
-    @PortedFrom(file = "Actor.h", name = "clear")
-    public void clear() {
-        found.clear();
-    }
-
-    @Override
-    @PortedFrom(file = "Actor.h", name = "apply")
-    public boolean apply(TaxonomyVertex v) {
-        if (tryVertex(v)) {
-            found.add(v);
-            return true;
-        }
-        return false;
-    }
+    @PortedFrom(file = "Actor.h", name = "interrupt") protected boolean interrupt;
 
     /**
      * check whether actor is applicable to the ENTRY
@@ -57,6 +29,7 @@ public class ActorImpl implements Actor, Serializable {
      *        entry
      * @return true if applicable
      */
+    @Override
     @PortedFrom(file = "Actor.h", name = "applicable")
     protected boolean applicable(ClassifiableEntry entry) {
         if (isRole) {
@@ -64,13 +37,12 @@ public class ActorImpl implements Actor, Serializable {
             if (isStandard) {
                 return true;
             } else {
-                // data role -- need only direct ones
-                return entry.getId() > 0;
+                // data role -- need only direct ones and TOP/BOT
+                return entry.getId() > -1;
             }
         } else {
             // concept or individual: standard are concepts
-            return entry instanceof Concept
-                    && ((Concept) entry).isSingleton() != isStandard;
+            return entry instanceof Concept && ((Concept) entry).isSingleton() != isStandard;
         }
     }
 
@@ -83,15 +55,11 @@ public class ActorImpl implements Actor, Serializable {
      */
     @PortedFrom(file = "Actor.h", name = "fillArray")
     protected List<ClassifiableEntry> fillArray(TaxonomyVertex v) {
-        List<ClassifiableEntry> array = new ArrayList<ClassifiableEntry>();
+        List<ClassifiableEntry> array = new ArrayList<>();
         if (tryEntry(v.getPrimer())) {
             array.add(v.getPrimer());
         }
-        for (ClassifiableEntry p : v.synonyms()) {
-            if (tryEntry(p)) {
-                array.add(p);
-            }
-        }
+        add(array, v.synonyms().filter(this::tryEntry));
         return array;
     }
 
@@ -100,38 +68,7 @@ public class ActorImpl implements Actor, Serializable {
         if (tryEntry(v.getPrimer())) {
             return true;
         }
-        for (ClassifiableEntry p : v.synonyms()) {
-            if (tryEntry(p)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * @param p
-     *        p
-     * @return true iff current entry is visible
-     */
-    protected boolean tryEntry(ClassifiableEntry p) {
-        return !p.isSystem() && applicable(p);
-    }
-
-    /**
-     * @param v
-     *        v
-     * @return true if at least one entry of a vertex V is visible
-     */
-    protected boolean tryVertex(TaxonomyVertex v) {
-        if (tryEntry(v.getPrimer())) {
-            return true;
-        }
-        for (ClassifiableEntry p : v.synonyms()) {
-            if (tryEntry(p)) {
-                return true;
-            }
-        }
-        return false;
+        return v.synonyms().anyMatch(this::tryEntry);
     }
 
     /** set the actor to look for classes */
@@ -177,11 +114,7 @@ public class ActorImpl implements Actor, Serializable {
      */
     @PortedFrom(file = "Actor.h", name = "getElements2D")
     public List<List<ClassifiableEntry>> getElements2D() {
-        List<List<ClassifiableEntry>> ret = new ArrayList<List<ClassifiableEntry>>();
-        for (int i = 0; i < found.size(); ++i) {
-            ret.add(fillArray(found.get(i)));
-        }
-        return ret;
+        return asList(found.stream().map(this::fillArray));
     }
 
     /**
@@ -190,22 +123,6 @@ public class ActorImpl implements Actor, Serializable {
      */
     @PortedFrom(file = "Actor.h", name = "getElements1D")
     public List<ClassifiableEntry> getElements1D() {
-        List<ClassifiableEntry> vec = new ArrayList<ClassifiableEntry>();
-        for (TaxonomyVertex p : found) {
-            vec.addAll(fillArray(p));
-        }
-        return vec;
-    }
-
-    @Override
-    public void removePastBoundaries(Collection<TaxonomyVertex> pastBoundary) {
-        for (TaxonomyVertex t : pastBoundary) {
-            found.remove(t.getPrimer());
-            TaxonomyVertex t1 = t.getSynonymNode();
-            while (t1 != null) {
-                found.remove(t1.getPrimer());
-                t1 = t1.getSynonymNode();
-            }
-        }
+        return asList(found.stream().flatMap(p -> fillArray(p).stream()));
     }
 }

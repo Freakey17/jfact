@@ -2,6 +2,8 @@ package bugs;
 
 import static org.junit.Assert.assertTrue;
 
+import javax.annotation.Nonnull;
+
 import org.junit.Test;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.model.OWLClass;
@@ -13,6 +15,7 @@ import org.semanticweb.owlapi.model.OWLOntologyCreationException;
 @SuppressWarnings("javadoc")
 public class VerifyComplianceUniversityTestCase extends VerifyComplianceBase {
 
+    @Nonnull
     String input = "Prefix(owl:=<http://www.w3.org/2002/07/owl#>)\n"
             + "Prefix(rdf:=<http://www.w3.org/1999/02/22-rdf-syntax-ns#>)\n"
             + "Prefix(xml:=<http://www.w3.org/XML/1998/namespace>)\n"
@@ -124,41 +127,42 @@ public class VerifyComplianceUniversityTestCase extends VerifyComplianceBase {
     }
 
     @Override
+    @Nonnull
     protected String input() {
         return "/AF_university.owl.xml";
     }
 
-    private OWLClass assistantProfessor = C("urn:university#AssistantProfessor");
-    private OWLClass aiStudent = C("urn:university#AIStudent");
-    private OWLClass aiDept = C("urn:university#AI_Dept");
-    private OWLClass CS_Department = C("urn:university#CS_Department");
-    private OWLClass HCIStudent = C("urn:university#HCIStudent");
-    private OWLClass CS_StudentTakingCourses = C("urn:university#CS_StudentTakingCourses");
-    private OWLClass LecturerTaking4Courses = C("urn:university#LecturerTaking4Courses");
-    private OWLClass Lecturer = C("urn:university#Lecturer");
-    private OWLClass CS_Course = C("urn:university#CS_Course");
-    private OWLClass Professor = C("urn:university#Professor");
-    private OWLClass ProfessorInHCIorAI = C("urn:university#ProfessorInHCIorAI");
-    private OWLClass UniversityPhoneBook = C("urn:university#UniversityPhoneBook");
-    private OWLClass ResearchArea = C("urn:university#ResearchArea");
-    private OWLClass TeachingFaculty = C("urn:university#TeachingFaculty");
-    private OWLClass Department = C("urn:university#Department");
-    private OWLClass Person = C("urn:university#Person");
-    private OWLClass CS_Student = C("urn:university#CS_Student");
-    private OWLClass Student = C("urn:university#Student");
-    private OWLClass PhoneBook = C("urn:university#PhoneBook");
-    private OWLClass EE_Course = C("urn:university#EE_Course");
-    private OWLClass Faculty = C("urn:university#Faculty");
-    private OWLClass CS_Library = C("urn:university#CS_Library");
-    private OWLClass EE_Department = C("urn:university#EE_Department");
-    private OWLClass FacultyPhoneBook = C("urn:university#FacultyPhoneBook");
-    private OWLClass Schedule = C("urn:university#Schedule");
-    private OWLClass Library = C("urn:university#Library");
-    private OWLClass Course = C("urn:university#Course");
-    private OWLClass EE_Library = C("urn:university#EE_Library");
-    private OWLDataProperty hasTenure = df.getOWLDataProperty(IRI
-            .create("urn:university#hasTenure"));
-
+//@formatter:off
+  @Nonnull  protected OWLClass assistantProfessor = C("urn:university#AssistantProfessor");
+  @Nonnull  protected OWLClass aiStudent = C("urn:university#AIStudent");
+  @Nonnull  protected OWLClass aiDept = C("urn:university#AI_Dept");
+  @Nonnull  protected OWLClass CS_Department = C("urn:university#CS_Department");
+  @Nonnull  protected OWLClass HCIStudent = C("urn:university#HCIStudent");
+  @Nonnull  protected OWLClass CS_StudentTakingCourses = C("urn:university#CS_StudentTakingCourses");
+  @Nonnull  protected OWLClass LecturerTaking4Courses = C("urn:university#LecturerTaking4Courses");
+  @Nonnull  protected OWLClass Lecturer = C("urn:university#Lecturer");
+  @Nonnull  protected OWLClass CS_Course = C("urn:university#CS_Course");
+  @Nonnull  protected OWLClass Professor = C("urn:university#Professor");
+  @Nonnull  protected OWLClass ProfessorInHCIorAI = C("urn:university#ProfessorInHCIorAI");
+  @Nonnull  protected OWLClass UniversityPhoneBook = C("urn:university#UniversityPhoneBook");
+  @Nonnull  protected OWLClass ResearchArea = C("urn:university#ResearchArea");
+  @Nonnull  protected OWLClass TeachingFaculty = C("urn:university#TeachingFaculty");
+  @Nonnull  protected OWLClass Department = C("urn:university#Department");
+  @Nonnull  protected OWLClass Person = C("urn:university#Person");
+  @Nonnull  protected OWLClass CS_Student = C("urn:university#CS_Student");
+  @Nonnull  protected OWLClass Student = C("urn:university#Student");
+  @Nonnull  protected OWLClass PhoneBook = C("urn:university#PhoneBook");
+  @Nonnull  protected OWLClass EE_Course = C("urn:university#EE_Course");
+  @Nonnull  protected OWLClass Faculty = C("urn:university#Faculty");
+  @Nonnull  protected OWLClass CS_Library = C("urn:university#CS_Library");
+  @Nonnull  protected OWLClass EE_Department = C("urn:university#EE_Department");
+  @Nonnull  protected OWLClass FacultyPhoneBook = C("urn:university#FacultyPhoneBook");
+  @Nonnull  protected OWLClass Schedule = C("urn:university#Schedule");
+  @Nonnull  protected OWLClass Library = C("urn:university#Library");
+  @Nonnull  protected OWLClass Course = C("urn:university#Course");
+  @Nonnull  protected OWLClass EE_Library = C("urn:university#EE_Library");
+  @Nonnull  protected OWLDataProperty hasTenure = df.getOWLDataProperty(IRI.create("urn:university#hasTenure"));
+//@formatter:on
     @Test
     public void shouldPassgetBottomClass() {
         equal(reasoner.getBottomClassNode(), assistantProfessor, aiStudent,
@@ -182,12 +186,6 @@ public class VerifyComplianceUniversityTestCase extends VerifyComplianceBase {
     @Test
     public void shouldPassisSatisfiableProfessorInHCIorAI() {
         equal(reasoner.isSatisfiable(ProfessorInHCIorAI), true);
-    }
-
-    @Test
-    public void shouldPassgetSubClassesowlThingtrue() {
-        equal(reasoner.getSubClasses(owlThing, true), PhoneBook, ResearchArea,
-                Department, Person, Library, Schedule, Course);
     }
 
     @Test
@@ -388,11 +386,6 @@ public class VerifyComplianceUniversityTestCase extends VerifyComplianceBase {
     @Test
     public void shouldPassgetSubClassesProfessortrue() {
         equal(reasoner.getSubClasses(Professor, true), ProfessorInHCIorAI);
-    }
-
-    @Test
-    public void shouldPassgetSuperClassesProfessortrue() {
-        equal(reasoner.getSuperClasses(Professor, true), TeachingFaculty);
     }
 
     @Test
@@ -849,11 +842,6 @@ public class VerifyComplianceUniversityTestCase extends VerifyComplianceBase {
     }
 
     @Test
-    public void shouldPassgetSuperClassesProfessorInHCIorAItrue() {
-        equal(reasoner.getSuperClasses(ProfessorInHCIorAI, true), Professor);
-    }
-
-    @Test
     public void shouldPassgetEquivalentClassesProfessorInHCIorAI() {
         equal(reasoner.getEquivalentClasses(ProfessorInHCIorAI),
                 ProfessorInHCIorAI);
@@ -969,6 +957,33 @@ public class VerifyComplianceUniversityTestCase extends VerifyComplianceBase {
     }
 
     @Test
+    public void shouldPassgetSubDataPropertieshasTenuretrue() {
+        equal(reasoner.getSubDataProperties(hasTenure, true),
+                bottomDataProperty);
+    }
+
+    @Test
+    public void shouldPassgetSuperDataPropertieshasTenuretrue() {
+        equal(reasoner.getSuperDataProperties(hasTenure, true), topDataProperty);
+    }
+
+    @Test
+    public void shouldPassgetSubClassesowlThingtrue() {
+        equal(reasoner.getSubClasses(owlThing, true), PhoneBook, ResearchArea,
+                Department, Person, Library, Schedule, Course);
+    }
+
+    @Test
+    public void shouldPassgetSuperClassesProfessortrue() {
+        equal(reasoner.getSuperClasses(Professor, true), TeachingFaculty);
+    }
+
+    @Test
+    public void shouldPassgetSuperClassesProfessorInHCIorAItrue() {
+        equal(reasoner.getSuperClasses(ProfessorInHCIorAI, true), Professor);
+    }
+
+    @Test
     public void shouldPassgetDataPropertyDomainshasTenurefalse() {
         equal(reasoner.getDataPropertyDomains(hasTenure, false), owlThing,
                 Faculty, TeachingFaculty, Person);
@@ -984,18 +999,13 @@ public class VerifyComplianceUniversityTestCase extends VerifyComplianceBase {
     }
 
     @Test
-    public void shouldPassgetSubDataPropertieshasTenuretrue() {
-        equal(reasoner.getSubDataProperties(hasTenure, true),
-                bottomDataProperty);
-    }
-
-    @Test
-    public void shouldPassgetSuperDataPropertieshasTenuretrue() {
-        equal(reasoner.getSuperDataProperties(hasTenure, true), topDataProperty);
-    }
-
-    @Test
     public void shouldPassgetDataPropertyDomainshasTenuretrue() {
         equal(reasoner.getDataPropertyDomains(hasTenure, true), TeachingFaculty);
+    }
+
+    @Test
+    public void shouldPassgetDataPropertyDomainshasTenureFalse() {
+        equal(reasoner.getDataPropertyDomains(hasTenure, false), owlThing,
+                Faculty, TeachingFaculty, Person);
     }
 }

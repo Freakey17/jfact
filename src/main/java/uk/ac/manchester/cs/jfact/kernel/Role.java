@@ -5,40 +5,39 @@ package uk.ac.manchester.cs.jfact.kernel;
  This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
  This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
+import static java.util.stream.Collectors.joining;
+import static org.semanticweb.owlapi.util.OWLAPIPreconditions.verifyNotNull;
+import static org.semanticweb.owlapi.util.OWLAPIStreamUtils.add;
 import static uk.ac.manchester.cs.jfact.helpers.DLTree.equalTrees;
-import static uk.ac.manchester.cs.jfact.helpers.Helper.bpINVALID;
+import static uk.ac.manchester.cs.jfact.helpers.Helper.BP_INVALID;
 import static uk.ac.manchester.cs.jfact.kernel.Token.RCOMPOSITION;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+
+import javax.annotation.Nullable;
 
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.reasoner.ReasonerInternalException;
 
-import uk.ac.manchester.cs.jfact.helpers.DLTree;
-import uk.ac.manchester.cs.jfact.helpers.DLTreeFactory;
-import uk.ac.manchester.cs.jfact.helpers.FastSet;
-import uk.ac.manchester.cs.jfact.helpers.FastSetFactory;
-import uk.ac.manchester.cs.jfact.helpers.LogAdapter;
-import uk.ac.manchester.cs.jfact.kernel.actors.AddRoleActor;
 import conformance.Original;
 import conformance.PortedFrom;
+import uk.ac.manchester.cs.chainsaw.FastSet;
+import uk.ac.manchester.cs.chainsaw.FastSetFactory;
+import uk.ac.manchester.cs.jfact.helpers.DLTree;
+import uk.ac.manchester.cs.jfact.helpers.DLTreeFactory;
+import uk.ac.manchester.cs.jfact.helpers.LogAdapter;
+import uk.ac.manchester.cs.jfact.kernel.actors.AddRoleActor;
 
 /** Role */
 @PortedFrom(file = "tRole.h", name = "Role")
 public class Role extends ClassifiableEntry {
 
-    private static final long serialVersionUID = 11000L;
+    private static final String NON_SIMPLE_ROLE = "Non simple role used as simple: ";
+    private static final String CYCLE_IN_RIA = "Cycle in RIA ";
 
     static class KnownValue implements Serializable {
 
-        private static final long serialVersionUID = 11000L;
         /** flag value */
         protected boolean value;
         /** whether flag set or not */
@@ -53,12 +52,16 @@ public class Role extends ClassifiableEntry {
             this(false);
         }
 
-        /** @return true iff the value is known to be set */
+        /**
+         * @return true iff the value is known to be set
+         */
         protected boolean isKnown() {
             return known;
         }
 
-        /** @return the value */
+        /**
+         * @return the value
+         */
         protected boolean getValue() {
             return value;
         }
@@ -76,138 +79,121 @@ public class Role extends ClassifiableEntry {
     }
 
     /** role that are inverse of given one */
-    @PortedFrom(file = "tRole.h", name = "Inverse")
-    private Role inverse = null;
+    @PortedFrom(file = "tRole.h", name = "Inverse") private Role inverse = null;
     /** Domain of role as a concept description; default null */
-    @PortedFrom(file = "tRole.h", name = "pDomain")
-    private DLTree pDomain = null;
+    @PortedFrom(file = "tRole.h", name = "pDomain") private DLTree pDomain = null;
     /** Domain of role as a concept description; default NULL */
-    @PortedFrom(file = "tRole.h", name = "pSpecialDomain")
-    private DLTree pSpecialDomain = null;
+    @PortedFrom(file = "tRole.h", name = "pSpecialDomain") private DLTree pSpecialDomain = null;
     /** domain in the form AR.Range for the complex roles */
-    @PortedFrom(file = "tRole.h", name = "bpSpecialDomain")
-    private int bpSpecialDomain = bpINVALID;
+    @PortedFrom(file = "tRole.h", name = "bpSpecialDomain") private int bpSpecialDomain = BP_INVALID;
     /** Domain of role as a pointer to DAG entry */
-    @PortedFrom(file = "tRole.h", name = "bpDomain")
-    private int bpDomain = bpINVALID;
+    @PortedFrom(file = "tRole.h", name = "bpDomain") private int bpDomain = BP_INVALID;
     /** pointer to role's functional definition DAG entry (or just TOP) */
-    @PortedFrom(file = "tRole.h", name = "Functional")
-    private int functional = bpINVALID;
+    @PortedFrom(file = "tRole.h", name = "Functional") private int functional = BP_INVALID;
     /** is role relevant to current query */
-    @PortedFrom(file = "tRole.h", name = "rel")
-    private long rel = 0;
+    @PortedFrom(file = "tRole.h", name = "rel") private long rel = 0;
     /** label of a domain (inverse role is used for a range label) */
-    @PortedFrom(file = "tRole.h", name = "domLabel")
-    private final MergableLabel domLabel = new MergableLabel();
+    @PortedFrom(file = "tRole.h", name = "domLabel") private final MergableLabel domLabel = new MergableLabel();
     // for later filling
-    @PortedFrom(file = "tRole.h", name = "Ancestor")
-    private final List<Role> ancestorRoles = new ArrayList<Role>();
-    @PortedFrom(file = "tRole.h", name = "Descendant")
-    private final List<Role> descendantRoles = new ArrayList<Role>();
+    @PortedFrom(file = "tRole.h", name = "Ancestor") private final List<Role> ancestorRoles = new ArrayList<>();
+    @PortedFrom(file = "tRole.h", name = "Descendant") private final List<Role> descendantRoles = new ArrayList<>();
     /** set of the most functional super-roles */
-    @PortedFrom(file = "tRole.h", name = "TopFunc")
-    private final List<Role> topFunctionalRoles = new ArrayList<Role>();
+    @PortedFrom(file = "tRole.h", name = "TopFunc") private final List<Role> topFunctionalRoles = new ArrayList<>();
     /** set of the roles that are disjoint with a given one */
-    @PortedFrom(file = "tRole.h", name = "Disjoint")
-    private final Set<Role> disjointRoles = new HashSet<Role>();
+    @PortedFrom(file = "tRole.h", name = "Disjoint") private final Set<Role> disjointRoles = new HashSet<>();
     /** all compositions in the form R1*R2*\ldots*Rn [= R */
-    @PortedFrom(file = "tRole.h", name = "subCompositions")
-    private final LinkedHashSet<List<Role>> subCompositions = new LinkedHashSet<List<Role>>();
+    @PortedFrom(file = "tRole.h", name = "subCompositions") private final LinkedHashSet<List<Role>> subCompositions = new LinkedHashSet<>();
     /** bit-vector of all parents */
-    @PortedFrom(file = "tRole.h", name = "AncMap")
-    private final FastSet ancestorMap = FastSetFactory.create();
+    @PortedFrom(file = "tRole.h", name = "AncMap") private final FastSet ancestorMap = FastSetFactory.create();
     /** bit-vector of all roles disjoint with current */
-    @PortedFrom(file = "tRole.h", name = "DJRoles")
-    private final FastSet disjointRolesIndex = FastSetFactory.create();
+    @PortedFrom(file = "tRole.h", name = "DJRoles") private final FastSet disjointRolesIndex = FastSetFactory.create();
     /** automaton for role */
-    @PortedFrom(file = "tRole.h", name = "automaton")
-    private final RoleAutomaton automaton = new RoleAutomaton();
+    @PortedFrom(file = "tRole.h", name = "automaton") private final RoleAutomaton automaton = new RoleAutomaton();
     /** value for functionality */
-    @PortedFrom(file = "tRole.h", name = "Functionality")
-    private final KnownValue functionality = new KnownValue();
+    @PortedFrom(file = "tRole.h", name = "Functionality") private final KnownValue functionality = new KnownValue();
     /** value for symmetry */
-    @PortedFrom(file = "tRole.h", name = "Symmetry")
-    private final KnownValue symmetry = new KnownValue();
+    @PortedFrom(file = "tRole.h", name = "Symmetry") private final KnownValue symmetry = new KnownValue();
     /** value for asymmetricity */
-    @PortedFrom(file = "tRole.h", name = "Asymmetry")
-    private final KnownValue asymmetry = new KnownValue();
+    @PortedFrom(file = "tRole.h", name = "Asymmetry") private final KnownValue asymmetry = new KnownValue();
     /** value for transitivity */
-    @PortedFrom(file = "tRole.h", name = "Transitivity")
-    private final KnownValue transitivity = new KnownValue();
+    @PortedFrom(file = "tRole.h", name = "Transitivity") private final KnownValue transitivity = new KnownValue();
     /** value for reflexivity */
-    @PortedFrom(file = "tRole.h", name = "Reflexivity")
-    private final KnownValue reflexivity = new KnownValue();
+    @PortedFrom(file = "tRole.h", name = "Reflexivity") private final KnownValue reflexivity = new KnownValue();
     /** value for reflexivity */
-    @PortedFrom(file = "tRole.h", name = "Irreflexivity")
-    private final KnownValue irreflexivity = new KnownValue();
+    @PortedFrom(file = "tRole.h", name = "Irreflexivity") private final KnownValue irreflexivity = new KnownValue();
     /** flag to show that this role needs special R and D processing */
-    @PortedFrom(file = "tRole.h", name = "SpecialDomain")
-    private boolean specialDomain = false;
+    @PortedFrom(file = "tRole.h", name = "SpecialDomain") private boolean specialDomain = false;
+    @Original private boolean dataRole;
+
+    protected Role(IRI name) {
+        super(name);
+        setCompletelyDefined(true);
+        // role hierarchy is completely defined by its parents
+        addTrivialTransition(this);
+    }
 
     /**
      * add automaton of a sub-role to a given one
      * 
-     * @param R
+     * @param r
      *        R
      */
     @PortedFrom(file = "tRole.h", name = "addSubRoleAutomaton")
-    private void addSubRoleAutomaton(Role R) {
-        if (!equals(R)) {
-            automaton.addRA(R.getAutomaton());
+    private void addSubRoleAutomaton(Role r) {
+        if (!equals(r)) {
+            automaton.addRA(r.getAutomaton());
         }
     }
 
     @PortedFrom(file = "tRole.h", name = "addTrivialTransition")
     private void addTrivialTransition(Role r) {
-        automaton.addTransitionSafe(RoleAutomaton.initial, new RATransition(
-                RoleAutomaton.final_state, r));
+        automaton.addTransitionSafe(RoleAutomaton.INITIAL, new RATransition(RoleAutomaton.FINAL_STATE, r));
     }
 
     /**
      * @return get an automaton by a (possibly synonymical) role
-     * @param R
+     * @param r
      *        R
-     * @param RInProcess
+     * @param rolesInProcess
      *        RInProcess
      */
     @PortedFrom(file = "tRole.h", name = "completeAutomatonByRole")
-    private RoleAutomaton completeAutomatonByRole(Role R, Set<Role> RInProcess) {
+    private RoleAutomaton completeAutomatonByRole(Role r, Set<Role> rolesInProcess) {
         // no synonyms here
-        assert !R.isSynonym();
+        assert !r.isSynonym();
         // no case ...*S*... [= S
-        assert R != this;
-        R.completeAutomaton(RInProcess);
-        return R.automaton;
+        assert r != this;
+        r.completeAutomaton(rolesInProcess);
+        return r.automaton;
     }
 
     /** merge domains */
     @PortedFrom(file = "tRole.h", name = "mergeSupersDomain")
     public void mergeSupersDomain() {
-        for (int i = 0; i < ancestorRoles.size(); i++) {
-            domLabel.merge(ancestorRoles.get(i).domLabel);
-        }
+        ancestorRoles.forEach(p -> domLabel.merge(p.domLabel));
         // for reflexive role -- merge domain and range labels
         if (isReflexive()) {
             domLabel.merge(getRangeLabel());
         }
         // for R1*R2*...*Rn [= R, merge dom(R) with dom(R1) and ran(R) with
         // ran(Rn)
-        for (List<Role> q : subCompositions) {
-            if (!q.isEmpty()) {
-                domLabel.merge(q.get(0).domLabel);
-                getRangeLabel().merge(q.get(q.size() - 1).getRangeLabel());
-            }
-        }
+        subCompositions.stream().filter(p -> !p.isEmpty()).forEach(q -> {
+            domLabel.merge(q.get(0).domLabel);
+            getRangeLabel().merge(q.get(q.size() - 1).getRangeLabel());
+        });
     }
 
-    /** @return inverse of given role (non- version) */
+    /**
+     * @return inverse of given role (non- version)
+     */
     @PortedFrom(file = "tRole.h", name = "inverse")
     public Role inverse() {
-        assert inverse != null;
-        return resolveSynonym(inverse);
+        return resolveSynonym(verifyNotNull(inverse, "inverse not initialized"));
     }
 
-    /** @return real inverse of a role (RO) */
+    /**
+     * @return real inverse of a role (RO)
+     */
     @PortedFrom(file = "tRole.h", name = "realInverse")
     public Role realInverse() {
         assert inverse != null;
@@ -236,13 +222,17 @@ public class Role extends ClassifiableEntry {
         return automaton.isSimple();
     }
 
-    /** @return special domain */
+    /**
+     * @return special domain
+     */
     @PortedFrom(file = "tRole.h", name = "getTSpecialDomain")
     public DLTree getTSpecialDomain() {
         return pSpecialDomain;
     }
 
-    /** @return true iff role has a special domain */
+    /**
+     * @return true iff role has a special domain
+     */
     @PortedFrom(file = "tRole.h", name = "hasSpecialDomain")
     public boolean hasSpecialDomain() {
         return specialDomain;
@@ -254,11 +244,9 @@ public class Role extends ClassifiableEntry {
         if (!hasSpecialDomain() || getTRange() == null) {
             pSpecialDomain = DLTreeFactory.createTop();
         } else {
-            pSpecialDomain = DLTreeFactory.createSNFForall(
-                    DLTreeFactory.createRole(this), getTRange().copy());
-            pSpecialDomain = DLTreeFactory.createSNFForall(
-                    DLTreeFactory.buildTree(new Lexeme(Token.RNAME, this)),
-                    getTRange().copy());
+            pSpecialDomain = DLTreeFactory.createSNFForall(DLTreeFactory.createRole(this), getTRange().copy());
+            pSpecialDomain = DLTreeFactory.createSNFForall(DLTreeFactory.buildTree(new Lexeme(Token.RNAME, this)),
+                getTRange().copy());
         }
     }
 
@@ -273,10 +261,9 @@ public class Role extends ClassifiableEntry {
         bpSpecialDomain = bp;
     }
 
-    @Original
-    private boolean dataRole;
-
-    /** @return distinguish data- and non-data role */
+    /**
+     * @return distinguish data- and non-data role
+     */
     @Original
     public boolean isDataRole() {
         return dataRole;
@@ -291,13 +278,17 @@ public class Role extends ClassifiableEntry {
         dataRole = action;
     }
 
-    /** @return test if role is functional (ie, have some functional ancestors) */
+    /**
+     * @return test if role is functional (ie, have some functional ancestors)
+     */
     @PortedFrom(file = "tRole.h", name = "isFunctional")
     public boolean isFunctional() {
         return functionality.getValue();
     }
 
-    /** @return check whether the functionality of a role is known */
+    /**
+     * @return check whether the functionality of a role is known
+     */
     @PortedFrom(file = "tRole.h", name = "isFunctionalityKnown")
     public boolean isFunctionalityKnown() {
         return functionality.isKnown();
@@ -324,13 +315,17 @@ public class Role extends ClassifiableEntry {
     }
 
     // transitivity
-    /** @return check whether the role is transitive */
+    /**
+     * @return check whether the role is transitive
+     */
     @PortedFrom(file = "tRole.h", name = "isTransitive")
     public boolean isTransitive() {
         return transitivity.getValue();
     }
 
-    /** @return check whether the transitivity of a role is known */
+    /**
+     * @return check whether the transitivity of a role is known
+     */
     @PortedFrom(file = "tRole.h", name = "isTransitivityKnown")
     public boolean isTransitivityKnown() {
         return transitivity.isKnown();
@@ -349,13 +344,17 @@ public class Role extends ClassifiableEntry {
     }
 
     // symmetry
-    /** @return check whether the role is symmetric */
+    /**
+     * @return check whether the role is symmetric
+     */
     @PortedFrom(file = "tRole.h", name = "isSymmetric")
     public boolean isSymmetric() {
         return symmetry.getValue();
     }
 
-    /** @return check whether the symmetry of a role is known */
+    /**
+     * @return check whether the symmetry of a role is known
+     */
     @PortedFrom(file = "tRole.h", name = "isSymmetryKnown")
     public boolean isSymmetryKnown() {
         return symmetry.isKnown();
@@ -374,13 +373,17 @@ public class Role extends ClassifiableEntry {
     }
 
     // asymmetry
-    /** @return check whether the role is asymmetric */
+    /**
+     * @return check whether the role is asymmetric
+     */
     @PortedFrom(file = "tRole.h", name = "isAsymmetric")
     public boolean isAsymmetric() {
         return asymmetry.getValue();
     }
 
-    /** @return check whether the asymmetry of a role is known */
+    /**
+     * @return check whether the asymmetry of a role is known
+     */
     @PortedFrom(file = "tRole.h", name = "isAsymmetryKnown")
     public boolean isAsymmetryKnown() {
         return asymmetry.isKnown();
@@ -398,13 +401,17 @@ public class Role extends ClassifiableEntry {
         inverse().asymmetry.setValue(value);
     }
 
-    /** @return check whether the role is reflexive */
+    /**
+     * @return check whether the role is reflexive
+     */
     @PortedFrom(file = "tRole.h", name = "isReflexive")
     public boolean isReflexive() {
         return reflexivity.getValue();
     }
 
-    /** @return check whether the reflexivity of a role is known */
+    /**
+     * @return check whether the reflexivity of a role is known
+     */
     @PortedFrom(file = "tRole.h", name = "isReflexivityKnown")
     public boolean isReflexivityKnown() {
         return reflexivity.isKnown();
@@ -423,13 +430,17 @@ public class Role extends ClassifiableEntry {
     }
 
     // irreflexivity
-    /** @return check whether the role is irreflexive */
+    /**
+     * @return check whether the role is irreflexive
+     */
     @PortedFrom(file = "tRole.h", name = "isIrreflexive")
     public boolean isIrreflexive() {
         return irreflexivity.getValue();
     }
 
-    /** @return check whether the irreflexivity of a role is known */
+    /**
+     * @return check whether the irreflexivity of a role is known
+     */
     @PortedFrom(file = "tRole.h", name = "isIrreflexivityKnown")
     public boolean isIrreflexivityKnown() {
         return irreflexivity.isKnown();
@@ -455,8 +466,7 @@ public class Role extends ClassifiableEntry {
     public boolean isTopFunc() {
         // check for emptyness is here due to case where a role is determined to
         // be a functional
-        return !topFunctionalRoles.isEmpty()
-                && topFunctionalRoles.get(0).equals(this);
+        return !topFunctionalRoles.isEmpty() && topFunctionalRoles.get(0).equals(this);
     }
 
     /**
@@ -470,7 +480,9 @@ public class Role extends ClassifiableEntry {
         functional = fNode;
     }
 
-    /** @return get the Functional DAG vertex */
+    /**
+     * @return get the Functional DAG vertex
+     */
     @PortedFrom(file = "tRole.h", name = "getFunctional")
     public int getFunctional() {
         return functional;
@@ -499,13 +511,17 @@ public class Role extends ClassifiableEntry {
     }
 
     // Sorted reasoning interface
-    /** @return label of the role's domain */
+    /**
+     * @return label of the role's domain
+     */
     @PortedFrom(file = "tRole.h", name = "getDomainLabel")
     public MergableLabel getDomainLabel() {
         return domLabel;
     }
 
-    /** @return label of the role's range */
+    /**
+     * @return label of the role's range
+     */
     @PortedFrom(file = "tRole.h", name = "getRangeLabel")
     public MergableLabel getRangeLabel() {
         return inverse().domLabel;
@@ -519,6 +535,7 @@ public class Role extends ClassifiableEntry {
      */
     @PortedFrom(file = "tRole.h", name = "setDomain")
     public void setDomain(DLTree p) {
+        // not just a CName
         if (equalTrees(pDomain, p)) {
             // usual case when you have a name for inverse role
         } else if (DLTreeFactory.isFunctionalExpr(p, this)) {
@@ -526,7 +543,7 @@ public class Role extends ClassifiableEntry {
             // functional restriction in the role domain means the role is
             // functional
         } else {
-            pDomain = DLTreeFactory.createSNFAnd(Arrays.asList(pDomain, p));
+            pDomain = DLTreeFactory.createSNFReducedAnd(pDomain, p);
         }
     }
 
@@ -541,13 +558,19 @@ public class Role extends ClassifiableEntry {
         inverse().setDomain(p);
     }
 
-    /** @return domain-as-a-tree of the role */
+    /**
+     * @return domain-as-a-tree of the role
+     */
+    @Nullable
     @PortedFrom(file = "tRole.h", name = "getTDomain")
     public DLTree getTDomain() {
         return pDomain;
     }
 
-    /** @return range-as-a-tree of the role */
+    /**
+     * @return range-as-a-tree of the role
+     */
+    @Nullable
     @PortedFrom(file = "tRole.h", name = "getTRange")
     private DLTree getTRange() {
         return inverse().pDomain;
@@ -556,9 +579,7 @@ public class Role extends ClassifiableEntry {
     /** merge to Domain all domains from super-roles */
     @PortedFrom(file = "tRole.h", name = "collectDomainFromSupers")
     public void collectDomainFromSupers() {
-        for (int i = 0; i < ancestorRoles.size(); i++) {
-            setDomain(ancestorRoles.get(i).pDomain.copy());
-        }
+        ancestorRoles.forEach(p -> setDomain(p.pDomain.copy()));
     }
 
     /**
@@ -572,13 +593,17 @@ public class Role extends ClassifiableEntry {
         bpDomain = p;
     }
 
-    /** @return domain-as-a-bipointer of the role */
+    /**
+     * @return domain-as-a-bipointer of the role
+     */
     @PortedFrom(file = "tRole.h", name = "getBPDomain")
     public int getBPDomain() {
         return bpDomain;
     }
 
-    /** @return range-as-a-bipointer of the role */
+    /**
+     * @return range-as-a-bipointer of the role
+     */
     @PortedFrom(file = "tRole.h", name = "getBPRange")
     public int getBPRange() {
         return inverse().bpDomain;
@@ -588,16 +613,16 @@ public class Role extends ClassifiableEntry {
     /**
      * set R and THIS as a disjoint; use it after Anc/Desc are determined
      * 
-     * @param R
+     * @param r
      *        R
      */
     @PortedFrom(file = "tRole.h", name = "addDisjointRole")
-    public void addDisjointRole(Role R) {
-        disjointRoles.add(R);
-        for (Role p : R.descendantRoles) {
+    public void addDisjointRole(Role r) {
+        disjointRoles.add(r);
+        r.descendantRoles.forEach(p -> {
             disjointRoles.add(p);
             p.disjointRoles.add(this);
-        }
+        });
     }
 
     /** check (and correct) case whether R != S for R [= S */
@@ -605,11 +630,14 @@ public class Role extends ClassifiableEntry {
     public void checkHierarchicalDisjoint() {
         this.checkHierarchicalDisjoint(this);
         if (isReflexive()) {
+            // for reflexive roles check for R^- is necessary
             this.checkHierarchicalDisjoint(inverse());
         }
     }
 
-    /** @return check whether a role is disjoint with anything */
+    /**
+     * @return check whether a role is disjoint with anything
+     */
     @PortedFrom(file = "tRole.h", name = "isDisjoint")
     public boolean isDisjoint() {
         return !disjointRoles.isEmpty();
@@ -632,8 +660,7 @@ public class Role extends ClassifiableEntry {
      */
     @PortedFrom(file = "tRole.h", name = "<")
     private boolean lesser(Role r) {
-        return isDataRole() == r.isDataRole()
-                && ancestorMap.contains(r.getAbsoluteIndex());
+        return isDataRole() == r.isDataRole() && ancestorMap.contains(r.getAbsoluteIndex());
     }
 
     /**
@@ -646,15 +673,19 @@ public class Role extends ClassifiableEntry {
         return equals(r) || lesser(r);
     }
 
-    /** @return list of ancestor roles */
+    /**
+     * @return list of ancestor roles
+     */
     @PortedFrom(file = "tRole.h", name = "begin_anc")
     public List<Role> getAncestor() {
         return ancestorRoles;
     }
 
-    /** @return func super-roles w/o func parents via iterator */
+    /**
+     * @return func super-roles w/o func parents via iterator
+     */
     @PortedFrom(file = "tRole.h", name = "begin_topfunc")
-    public List<Role> begin_topfunc() {
+    public List<Role> beginTopfunc() {
         return topFunctionalRoles;
     }
 
@@ -679,12 +710,19 @@ public class Role extends ClassifiableEntry {
      */
     @PortedFrom(file = "tRole.h", name = "addComposition")
     public void addComposition(DLTree tree) {
-        List<Role> RS = new ArrayList<Role>();
-        fillsComposition(RS, tree);
-        subCompositions.add(RS);
+        List<Role> rs = new ArrayList<>();
+        fillsComposition(rs, tree);
+        subCompositions.add(rs);
     }
 
-    /** @return RA for the role */
+    @Override
+    public void addParent(ClassifiableEntry parent) {
+        addP(parent);
+    }
+
+    /**
+     * @return RA for the role
+     */
     @PortedFrom(file = "tRole.h", name = "getAutomaton")
     public RoleAutomaton getAutomaton() {
         return automaton;
@@ -698,9 +736,9 @@ public class Role extends ClassifiableEntry {
      */
     @PortedFrom(file = "tRole.h", name = "eliminateToldCycles")
     public Role eliminateToldCycles() {
-        Set<Role> RInProcess = new HashSet<Role>();
-        List<Role> ToldSynonyms = new ArrayList<Role>();
-        return this.eliminateToldCycles(RInProcess, ToldSynonyms);
+        Set<Role> rolesInProcess = new HashSet<>();
+        List<Role> toldSynonyms = new ArrayList<>();
+        return this.eliminateToldCycles(rolesInProcess, toldSynonyms);
     }
 
     /**
@@ -711,8 +749,8 @@ public class Role extends ClassifiableEntry {
      */
     @PortedFrom(file = "tRole.h", name = "completeAutomaton")
     public void completeAutomaton(int nRoles) {
-        Set<Role> RInProcess = new HashSet<Role>();
-        this.completeAutomaton(RInProcess);
+        Set<Role> rolesInProcess = new HashSet<>();
+        this.completeAutomaton(rolesInProcess);
         automaton.setup(nRoles, isDataRole());
     }
 
@@ -720,27 +758,28 @@ public class Role extends ClassifiableEntry {
     @PortedFrom(file = "tRole.h", name = "consistent")
     public void consistent() {
         if (isSimple()) {
+            // all simple roles are consistent
             return;
         }
         if (isFunctional()) {
-            throw new ReasonerInternalException(
-                    "Non simple role used as simple: " + getName());
+            // non-simple role can not be functional
+            throw new ReasonerInternalException(NON_SIMPLE_ROLE + getIRI());
         }
         if (isDataRole()) {
-            throw new ReasonerInternalException(
-                    "Non simple role used as simple: " + getName());
+            // data role can not be non-simple
+            throw new ReasonerInternalException(NON_SIMPLE_ROLE + getIRI());
         }
         if (this.isDisjoint()) {
-            throw new ReasonerInternalException(
-                    "Non simple role used as simple: " + getName());
+            // non-simple role can not be disjoint with any role
+            throw new ReasonerInternalException(NON_SIMPLE_ROLE + getIRI());
         }
     }
 
     @Original
-    private static Role resolveRoleHelper(DLTree t, String r) {
+    @SuppressWarnings("incomplete-switch")
+    private static Role resolveRoleHelper(@Nullable DLTree t, String r) {
         if (t == null) {
-            throw new ReasonerInternalException("Role expression expected: "
-                    + r);
+            throw new ReasonerInternalException("Role expression expected: " + r);
         }
         switch (t.token()) {
             case RNAME: // role name
@@ -749,8 +788,7 @@ public class Role extends ClassifiableEntry {
             case INV: // inversion
                 return resolveRoleHelper(t.getChild(), r).inverse();
             default: // error
-                throw new ReasonerInternalException("Invalid role expression: "
-                        + r + " but got: " + t);
+                throw new ReasonerInternalException("Invalid role expression: " + r + " but got: " + t);
         }
     }
 
@@ -776,14 +814,9 @@ public class Role extends ClassifiableEntry {
         return resolveSynonym(resolveRoleHelper(t, ""));
     }
 
-    protected Role(IRI name) {
-        super(name);
-        setCompletelyDefined(true);
-        // role hierarchy is completely defined by its parents
-        addTrivialTransition(this);
-    }
-
-    /** @return (unsigned) unique index of the role */
+    /**
+     * @return (unsigned) unique index of the role
+     */
     @PortedFrom(file = "tRole.h", name = "getIndex")
     public int getAbsoluteIndex() {
         int i = 2 * extId;
@@ -797,78 +830,102 @@ public class Role extends ClassifiableEntry {
     }
 
     @PortedFrom(file = "tRole.h", name = "fillsComposition")
-    private void fillsComposition(List<Role> Composition, DLTree tree) {
+    private void fillsComposition(List<Role> composition, DLTree tree) {
         if (tree.token() == RCOMPOSITION) {
-            fillsComposition(Composition, tree.getLeft());
-            fillsComposition(Composition, tree.getRight());
+            tree.getChildren().forEach(t -> fillsComposition(composition, t));
         } else {
-            Composition.add(resolveRole(tree));
+            composition.add(resolveRole(tree));
         }
     }
 
-    /** add features */
+    /**
+     * copy role information (like transitivity, functionality, etc) to synonym
+     */
     @PortedFrom(file = "tRole.h", name = "addFeaturesToSynonym")
     public void addFeaturesToSynonym() {
         if (!isSynonym()) {
             return;
         }
+        // don't copy parents: they are already copied during ToldSubsumers
+        // processing
         Role syn = resolveSynonym(this);
-        if (isFunctional() && !syn.isFunctional()) {
+        // copy functionality
+        if (isFunctional() || syn.isFunctional()) {
             syn.setFunctional();
         }
-        if (isTransitive()) {
+        // copy transitivity
+        if (isTransitive() || syn.isTransitive()) {
             syn.setTransitive(true);
         }
-        if (isReflexive()) {
+        // copy reflexivity
+        if (isReflexive() || syn.isReflexive()) {
             syn.setReflexive(true);
         }
-        if (isDataRole()) {
+        // copy data type
+        if (isDataRole() || syn.isDataRole()) {
             syn.setDataRole(true);
         }
+        // copy R&D
         if (pDomain != null) {
             syn.setDomain(pDomain.copy());
         }
-        if (this.isDisjoint()) {
+        // copy disjoint
+        if (isDisjoint()) {
             syn.disjointRoles.addAll(disjointRoles);
         }
+        // copy subCompositions
         syn.subCompositions.addAll(subCompositions);
-        toldSubsumers.clear();
+        // syn should be the only parent for synonym
+        toldSubsumers = null;
         addParent(syn);
     }
 
+    @Nullable
     @PortedFrom(file = "tRole.h", name = "eliminateToldCycles")
-    private Role eliminateToldCycles(Set<Role> RInProcess,
-            List<Role> ToldSynonyms) {
+    private Role eliminateToldCycles(Set<Role> rolesInProcess, List<Role> toldSynonyms) {
+        // skip synonyms
         if (isSynonym()) {
             return null;
         }
-        if (RInProcess.contains(this)) {
-            ToldSynonyms.add(this);
+        // if we found a cycle...
+        if (rolesInProcess.contains(this)) {
+            toldSynonyms.add(this);
             return this;
         }
         Role ret = null;
-        RInProcess.add(this);
+        // start processing role
+        rolesInProcess.add(this);
+        // ensure that parents does not contain synonyms
         removeSynonymsFromParents();
-        for (ClassifiableEntry r : toldSubsumers) {
-            if ((ret = ((Role) r).eliminateToldCycles(RInProcess, ToldSynonyms)) != null) {
-                if (ret.equals(this)) {
-                    Collections.sort(ToldSynonyms, new RoleCompare());
-                    ret = ToldSynonyms.get(0);
-                    for (int i = 1; i < ToldSynonyms.size(); i++) {
-                        Role p = ToldSynonyms.get(i);
-                        p.setSynonym(ret);
-                        ret.addParents(p.getToldSubsumers());
+        // not involved in cycle -- check all told subsumers
+        if (hasToldSubsumers()) {
+            for (ClassifiableEntry r : toldSubsumers) {
+                // if cycle was detected
+                if ((ret = ((Role) r).eliminateToldCycles(rolesInProcess, toldSynonyms)) != null) {
+                    if (ret.equals(this)) {
+                        Collections.sort(toldSynonyms, new RoleCompare());
+                        // now first element is representative; save it as RET
+                        ret = toldSynonyms.get(0);
+                        // make all others synonyms of RET
+                        // XXX check if role error is here
+                        for (int i = 1; i < toldSynonyms.size(); i++) {
+                            Role p = toldSynonyms.get(i);
+                            p.setSynonym(ret);
+                            ret.addParents(p.getToldSubsumers());
+                        }
+                        toldSynonyms.clear();
+                        rolesInProcess.remove(this);
+                        // restart search for the representative
+                        return ret.eliminateToldCycles(rolesInProcess, toldSynonyms);
+                    } else {
+                        // some role inside a cycle: save it and return
+                        toldSynonyms.add(this);
+                        break;
                     }
-                    ToldSynonyms.clear();
-                    RInProcess.remove(this);
-                    return ret.eliminateToldCycles(RInProcess, ToldSynonyms);
-                } else {
-                    ToldSynonyms.add(this);
-                    break;
                 }
             }
         }
-        RInProcess.remove(this);
+        rolesInProcess.remove(this);
         return ret;
     }
 
@@ -883,37 +940,18 @@ public class Role extends ClassifiableEntry {
      */
     @PortedFrom(file = "tRole.h", name = "print")
     public void print(LogAdapter o) {
-        o.print("Role \"", getName(), "\"(")
-                .print(getId())
-                .print(")", isTransitive() ? "T" : "",
-                        isReflexive() ? "R" : "", isTopFunc() ? "t" : "",
-                        isFunctional() ? "F" : "", isDataRole() ? "D" : "");
+        o.print("Role \"", getIRI(), "\"(").print(getId()).print(")", isTransitive() ? "T" : "", isReflexive() ? "R"
+            : "", isTopFunc() ? "t" : "", isFunctional() ? "F" : "", isDataRole() ? "D" : "");
         if (isSynonym()) {
-            o.print(" = \"", getSynonym().getName(), "\"\n");
+            o.print(" = \"", getSynonym().getIRI(), "\"\n");
             return;
         }
-        if (!toldSubsumers.isEmpty()) {
-            o.print(" parents={\"");
-            List<ClassifiableEntry> l = new ArrayList<ClassifiableEntry>(
-                    toldSubsumers);
-            for (int i = 0; i < l.size(); i++) {
-                if (i > 0) {
-                    o.print("\", \"");
-                }
-                o.print(l.get(i).getName());
-            }
-            o.print("\"}");
+        if (hasToldSubsumers()) {
+            o.print(toldSubsumers.stream().map(ClassifiableEntry::getIRI).collect(joining("\", \"", " parents={\"",
+                "\"}")));
         }
         if (!disjointRoles.isEmpty()) {
-            o.print(" disjoint with {\"");
-            List<Role> l = new ArrayList<Role>(disjointRoles);
-            for (int i = 0; i < disjointRoles.size(); i++) {
-                if (i > 0) {
-                    o.print("\", \"");
-                }
-                o.print(l.get(i).getName());
-            }
-            o.print("\"}");
+            o.print(disjointRoles.stream().map(Role::getIRI).collect(joining("\", \"", " disjoint with {\"", "\"}")));
         }
         if (pDomain != null) {
             o.print(" Domain=(").print(bpDomain).print(")=", pDomain);
@@ -921,10 +959,8 @@ public class Role extends ClassifiableEntry {
         if (getTRange() != null) {
             o.print(" Range=(").print(getBPRange()).print(")=", getTRange());
         }
-        o.print("\nAutomaton (size ")
-                .print(automaton.size())
-                .print("): ", automaton.isISafe() ? "I" : "i",
-                        automaton.isOSafe() ? "O" : "o");
+        o.print("\nAutomaton (size ").print(automaton.size()).print("): ", automaton.isISafe() ? "I" : "i", automaton
+            .isOSafe() ? "O" : "o");
         automaton.print(o);
         o.print("\n");
     }
@@ -961,15 +997,14 @@ public class Role extends ClassifiableEntry {
 
     @PortedFrom(file = "tRole.h", name = "isRealTopFunc")
     private boolean isRealTopFunc() {
+        // all REAL top-funcs have their self-ref in TopFunc already
         if (!isFunctional()) {
             return false;
         }
-        for (int i = 0; i < ancestorRoles.size(); i++) {
-            if (ancestorRoles.get(i).isTopFunc()) {
-                return false;
-            }
-        }
-        return true;
+        // if any of the parent is self-proclaimed top-func -- this one is not
+        // top-func
+        // else this role is top-most functional
+        return ancestorRoles.stream().noneMatch(p -> p.isTopFunc());
     }
 
     @PortedFrom(file = "tRole.h", name = "initTopFunc")
@@ -980,159 +1015,152 @@ public class Role extends ClassifiableEntry {
         if (isTopFunc()) {
             topFunctionalRoles.clear();
         }
-        for (int i = 0; i < ancestorRoles.size(); i++) {
-            Role p = ancestorRoles.get(i);
-            if (p.isRealTopFunc()) {
-                topFunctionalRoles.add(p);
-            }
-        }
+        add(topFunctionalRoles, ancestorRoles.stream().filter(Role::isRealTopFunc));
         if (!topFunctionalRoles.isEmpty()) {
             functionality.setValue(true);
         }
     }
 
     @PortedFrom(file = "tRole.h", name = "checkHierarchicalDisjoint")
-    private void checkHierarchicalDisjoint(Role R) {
-        if (disjointRoles.contains(R)) {
+    private void checkHierarchicalDisjoint(Role r) {
+        if (disjointRoles.contains(r)) {
             setDomain(DLTreeFactory.createBottom());
             disjointRoles.clear();
             return;
         }
-        for (Role p : R.descendantRoles) {
-            if (disjointRoles.contains(p)) {
-                p.setDomain(DLTreeFactory.createBottom());
-                disjointRoles.remove(p);
-                p.disjointRoles.clear();
-            }
-        }
+        r.descendantRoles.stream().filter(disjointRoles::contains).forEach(p -> {
+            p.setDomain(DLTreeFactory.createBottom());
+            disjointRoles.remove(p);
+            p.disjointRoles.clear();
+        });
     }
 
     @PortedFrom(file = "tRole.h", name = "initDJMap")
     private void initDJMap() {
-        for (Role q : disjointRoles) {
-            disjointRolesIndex.add(q.getAbsoluteIndex());
-        }
+        disjointRoles.forEach(p -> disjointRolesIndex.add(p.getAbsoluteIndex()));
     }
 
     @PortedFrom(file = "tRole.h", name = "preprocessComposition")
-    private void preprocessComposition(List<Role> RS) {
+    private void preprocessComposition(List<Role> rs) {
+        // XXX verify how this works, as it's manipulating the input list as
+        // well, replacing synonyms
         boolean same = false;
-        int last = RS.size() - 1;
-        // TODO doublecheck, strange assignments to what is in the list
-        for (int i = 0; i < RS.size(); i++) {
-            Role p = RS.get(i);
-            Role R = resolveSynonym(p);
-            if (R.isBottom()) {
-                RS.clear();
+        int last = rs.size() - 1;
+        for (int i = 0; i < rs.size(); i++) {
+            Role p = rs.get(i);
+            Role r = resolveSynonym(p);
+            if (r.isBottom()) {
+                // empty role in composition -- nothing to do
+                rs.clear();
                 return;
             }
-            if (R.equals(this)) {
+            if (r.equals(this)) {
+                // found R in composition
                 if (i != 0 && i != last) {
-                    throw new ReasonerInternalException("Cycle in RIA "
-                            + getName());
+                    throw new ReasonerInternalException(CYCLE_IN_RIA + getIRI());
                 }
                 if (same) {
+                    // second one
                     if (last == 1) {
-                        RS.clear();
+                        // transitivity
+                        rs.clear();
                         setTransitive(true);
                         return;
                     } else {
-                        throw new ReasonerInternalException("Cycle in RIA "
-                                + getName());
+                        // wrong (undecidable) axiom
+                        throw new ReasonerInternalException(CYCLE_IN_RIA + getIRI());
                     }
                 } else {
+                    // first one
                     same = true;
                 }
             }
-            RS.set(i, R);
+            rs.set(i, r);
         }
     }
 
     @PortedFrom(file = "tRole.h", name = "completeAutomaton")
-    private void completeAutomaton(Set<Role> RInProcess) {
+    private void completeAutomaton(Set<Role> rolesInProcess) {
         if (automaton.isCompleted()) {
             return;
             // if we found a cycle...
         }
-        if (RInProcess.contains(this)) {
-            throw new ReasonerInternalException("Cycle in RIA " + getName());
+        if (rolesInProcess.contains(this)) {
+            throw new ReasonerInternalException(CYCLE_IN_RIA + getIRI());
         }
         // start processing role
-        RInProcess.add(this);
+        rolesInProcess.add(this);
         // make sure that all sub-roles already have completed automata
-        for (Role p : descendantRoles) {
-            p.completeAutomaton(RInProcess);
-        }
+        descendantRoles.forEach(p -> p.completeAutomaton(rolesInProcess));
         // add automata for complex role inclusions
-        for (List<Role> q : subCompositions) {
-            addSubCompositionAutomaton(q, RInProcess);
-        }
+        subCompositions.forEach(q -> addSubCompositionAutomaton(q, rolesInProcess));
         // check for the transitivity
         if (isTransitive()) {
-            automaton.addTransitionSafe(RoleAutomaton.final_state,
-                    new RATransition(RoleAutomaton.initial));
+            automaton.addTransitionSafe(RoleAutomaton.FINAL_STATE, new RATransition(RoleAutomaton.INITIAL));
         }
         // here automaton is complete
         automaton.setCompleted(true);
-        if (!isBottom()) {
-            for (ClassifiableEntry p : toldSubsumers) {
-                Role R = (Role) resolveSynonym(p);
-                R.addSubRoleAutomaton(this);
-                if (hasSpecialDomain()) {
-                    R.specialDomain = true;
-                }
-            }
+        if (!isBottom() && hasToldSubsumers()) {
+            toldSubsumers.forEach(this::initRole);
         }
         // finish processing role
-        RInProcess.remove(this);
+        rolesInProcess.remove(this);
+    }
+
+    protected void initRole(ClassifiableEntry p) {
+        Role r = (Role) resolveSynonym(p);
+        r.addSubRoleAutomaton(this);
+        if (hasSpecialDomain()) {
+            r.specialDomain = true;
+        }
     }
 
     /**
      * add automaton for a role composition
      * 
-     * @param RS
+     * @param rs
      *        RS
-     * @param RInProcess
+     * @param rolesInProcess
      *        RInProcess
      */
     @PortedFrom(file = "tRole.h", name = "addSubCompositionAutomaton")
-    private void
-            addSubCompositionAutomaton(List<Role> RS, Set<Role> RInProcess) {
+    private void addSubCompositionAutomaton(List<Role> rs, Set<Role> rolesInProcess) {
         // first preprocess the role chain
-        preprocessComposition(RS);
-        if (RS.isEmpty()) {
+        preprocessComposition(rs);
+        if (rs.isEmpty()) {
+            // fallout from transitivity axiom
             return;
         }
         // here we need a special treatment for R&D
         specialDomain = true;
         // tune iterators and states
         int p = 0;
-        int p_last = RS.size() - 1;
-        int from = RoleAutomaton.initial, to = RoleAutomaton.final_state;
-        if (RS.get(0).equals(this)) {
+        int pLast = rs.size() - 1;
+        int from = RoleAutomaton.INITIAL, to = RoleAutomaton.FINAL_STATE;
+        if (rs.get(0).equals(this)) {
             ++p;
-            from = RoleAutomaton.final_state;
-        } else if (RS.get(p_last).equals(this)) {
-            --p_last;
-            to = RoleAutomaton.initial;
+            from = RoleAutomaton.FINAL_STATE;
+        } else if (rs.get(pLast).equals(this)) {
+            --pLast;
+            to = RoleAutomaton.INITIAL;
         }
         // make sure the role chain contain at least one element
-        assert p <= p_last;
+        assert p <= pLast;
         // create a chain
         boolean oSafe = false;
         // we couldn't assume that the current role
         // automaton is i- or o-safe
         automaton.initChain(from);
-        for (; p != p_last; ++p) {
-            oSafe = automaton.addToChain(
-                    completeAutomatonByRole(RS.get(p), RInProcess), oSafe);
+        for (; p != pLast; ++p) {
+            oSafe = automaton.addToChain(completeAutomatonByRole(rs.get(p), rolesInProcess), oSafe);
         }
         // add the last automaton to chain
-        automaton.addToChain(completeAutomatonByRole(RS.get(p), RInProcess),
-                oSafe, to);
+        automaton.addToChain(completeAutomatonByRole(rs.get(p), rolesInProcess), oSafe, to);
     }
 
-    /** @return inverse */
+    /**
+     * @return inverse
+     */
     @Original
     public Role getInverse() {
         return inverse;

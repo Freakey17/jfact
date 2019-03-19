@@ -6,23 +6,20 @@ package uk.ac.manchester.cs.jfact.kernel;
  This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.io.Serializable;
+import java.util.stream.IntStream;
 
-import uk.ac.manchester.cs.jfact.helpers.LogAdapter;
 import conformance.PortedFrom;
+import uk.ac.manchester.cs.jfact.helpers.LogAdapter;
 
 @PortedFrom(file = "dumpInterface.h", name = "dumpInterface")
 class DumpInterface implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** output stream */
-    @PortedFrom(file = "dumpInterface.h", name = "o")
-    protected final LogAdapter o;
+    @PortedFrom(file = "dumpInterface.h", name = "o") protected final LogAdapter o;
     /** indentation level */
-    @PortedFrom(file = "dumpInterface.h", name = "indent")
-    private int indent;
+    @PortedFrom(file = "dumpInterface.h", name = "indent") private int indent;
     /** print every axiom on a single line (need for sorting, for example) */
-    @PortedFrom(file = "dumpInterface.h", name = "oneliner")
-    private final boolean oneliner;
+    @PortedFrom(file = "dumpInterface.h", name = "oneliner") private final boolean oneliner;
 
     @PortedFrom(file = "dumpInterface.h", name = "o")
     public DumpInterface(LogAdapter oo) {
@@ -33,57 +30,81 @@ class DumpInterface implements Serializable {
 
     // global prologue/epilogue
     @PortedFrom(file = "dumpInterface.h", name = "prologue")
-    public void prologue() {}
+    public void prologue() {
+        // default implementation empty
+    }
 
     @PortedFrom(file = "dumpInterface.h", name = "epilogue")
-    public void epilogue() {}
+    public void epilogue() {
+        // default implementation empty
+    }
 
     // general concept expression
     @PortedFrom(file = "dumpInterface.h", name = "dumpTop")
-    public void dumpTop() {}
+    public void dumpTop() {
+        // default implementation empty
+    }
 
     @PortedFrom(file = "dumpInterface.h", name = "dumpBottom")
-    public void dumpBottom() {}
+    public void dumpBottom() {
+        // default implementation empty
+    }
 
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "dumpNumber")
-    public void dumpNumber(int n) {}
+    public void dumpNumber(int n) {
+        // default implementation empty
+    }
 
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "startOp")
-    public void startOp(DIOp Op) {}
+    public void startOp(DIOp op) {
+        // default implementation empty
+    }
 
     /**
      * start operation >=/<= with number
      * 
-     * @param Op
+     * @param op
      *        Op
      * @param n
      *        n
      */
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "startOp")
-    public void startOp(DIOp Op, int n) {}
+    public void startOp(DIOp op, int n) {
+        // default implementation empty
+    }
 
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "contOp")
-    public void contOp(DIOp Op) {}
+    public void contOp(DIOp op) {
+        // default implementation empty
+    }
 
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "finishOp")
-    public void finishOp(DIOp Op) {}
+    public void finishOp(DIOp op) {
+        // default implementation empty
+    }
 
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "startAx")
-    public void startAx(DIOp Ax) {}
+    public void startAx(DIOp ax) {
+        // default implementation empty
+    }
 
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "contAx")
-    public void contAx(DIOp Ax) {}
+    public void contAx(DIOp ax) {
+        // default implementation empty
+    }
 
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "finishAx")
-    public void finishAx(DIOp Ax) {}
+    public void finishAx(DIOp ax) {
+        // default implementation empty
+    }
 
     /**
      * obtain name by the named entry
@@ -93,7 +114,7 @@ class DumpInterface implements Serializable {
      */
     @PortedFrom(file = "dumpInterface.h", name = "dumpName")
     public void dumpName(NamedEntry p) {
-        o.print(p.getName());
+        o.print(p.getIRI());
     }
 
     /**
@@ -104,7 +125,9 @@ class DumpInterface implements Serializable {
      */
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "dumpConcept")
-    public void dumpConcept(Concept p) {}
+    public void dumpConcept(Concept p) {
+        // default implementation empty
+    }
 
     /**
      * dump role atom (as used in expression)
@@ -114,7 +137,9 @@ class DumpInterface implements Serializable {
      */
     @SuppressWarnings("unused")
     @PortedFrom(file = "dumpInterface.h", name = "dumpRole")
-    public void dumpRole(Role p) {}
+    public void dumpRole(Role p) {
+        // default implementation empty
+    }
 
     @PortedFrom(file = "dumpInterface.h", name = "skipIndent")
     public void skipIndent() {
@@ -122,9 +147,7 @@ class DumpInterface implements Serializable {
             return;
         }
         o.print("\n");
-        for (int i = indent - 1; i >= 0; --i) {
-            o.print("  ");
-        }
+        IntStream.rangeClosed(1, indent).forEach(i -> o.print("  "));
     }
 
     @PortedFrom(file = "dumpInterface.h", name = "incIndent")

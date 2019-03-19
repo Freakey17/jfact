@@ -10,60 +10,78 @@ import static uk.ac.manchester.cs.jfact.helpers.Helper.*;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.annotation.Nullable;
 
 import org.semanticweb.owlapi.model.OWLRuntimeException;
 
+import conformance.Original;
+import conformance.PortedFrom;
+import uk.ac.manchester.cs.chainsaw.FastSet;
+import uk.ac.manchester.cs.chainsaw.FastSetFactory;
 import uk.ac.manchester.cs.jfact.datatypes.DatatypeEntry;
 import uk.ac.manchester.cs.jfact.datatypes.LiteralEntry;
 import uk.ac.manchester.cs.jfact.helpers.DLVertex;
-import uk.ac.manchester.cs.jfact.helpers.FastSet;
-import uk.ac.manchester.cs.jfact.helpers.FastSetFactory;
 import uk.ac.manchester.cs.jfact.helpers.LogAdapter;
 import uk.ac.manchester.cs.jfact.helpers.StatIndex;
 import uk.ac.manchester.cs.jfact.helpers.Templates;
 import uk.ac.manchester.cs.jfact.helpers.UnreachableSituationException;
 import uk.ac.manchester.cs.jfact.kernel.modelcaches.ModelCacheInterface;
 import uk.ac.manchester.cs.jfact.kernel.options.JFactReasonerConfiguration;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** directed acyclic graph */
 @PortedFrom(file = "dlDag.h", name = "DLDag")
 public class DLDag implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** body of DAG */
-    @PortedFrom(file = "dlDag.h", name = "Heap")
-    private final List<DLVertex> heap = new ArrayList<DLVertex>();
+    @PortedFrom(file = "dlDag.h", name = "Heap") private final List<DLVertex> heap = new ArrayList<>();
+    private Set<NamedEntry> cache = new HashSet<>();
     /** all the AND nodes (needs to recompute) */
-    @PortedFrom(file = "dlDag.h", name = "listAnds")
-    private final FastSet listAnds = FastSetFactory.create();
-    @Original
-    private final EnumMap<DagTag, DLVTable> indexes = new EnumMap<DagTag, DLVTable>(
-            DagTag.class);
+    @PortedFrom(file = "dlDag.h", name = "listAnds") private final FastSet listAnds = FastSetFactory.create();
+    @Original private final EnumMap<DagTag, DLVTable> indexes = new EnumMap<>(DagTag.class);
     /** cache efficiency -- statistic purposes */
-    @PortedFrom(file = "dlDag.h", name = "nCacheHits")
-    private int nCacheHits;
+    @PortedFrom(file = "dlDag.h", name = "nCacheHits") private int nCacheHits;
     /** size of sort array */
-    @PortedFrom(file = "dlDag.h", name = "sortArraySize")
-    private int sortArraySize;
+    @PortedFrom(file = "dlDag.h", name = "sortArraySize") private int sortArraySize;
     /** sort index (if necessary). Possible values are Size, Depth, Freq */
-    @PortedFrom(file = "dlDag.h", name = "iSort")
-    private int iSort;
+    @PortedFrom(file = "dlDag.h", name = "iSort") private int iSort;
     /** whether or not sorting order is ascending */
-    @PortedFrom(file = "dlDag.h", name = "sortAscend")
-    private boolean sortAscend;
+    @PortedFrom(file = "dlDag.h", name = "sortAscend") private boolean sortAscend;
     /** prefer non-generating rules in OR orderings */
-    @PortedFrom(file = "dlDag.h", name = "preferNonGen")
-    private boolean preferNonGen;
+    @PortedFrom(file = "dlDag.h", name = "preferNonGen") private boolean preferNonGen;
     /** flag whether cache should be used */
-    @PortedFrom(file = "dlDag.h", name = "useDLVCache")
-    private boolean useDLVCache;
-    @PortedFrom(file = "dlDag.h", name = "finalDagSize")
-    private int finalDagSize;
-    @Original
-    private final JFactReasonerConfiguration options;
+    @PortedFrom(file = "dlDag.h", name = "useDLVCache") private boolean useDLVCache;
+    @PortedFrom(file = "dlDag.h", name = "finalDagSize") private int finalDagSize;
+    @Original private final JFactReasonerConfiguration options;
+
+    /**
+     * @param options
+     *        Options
+     */
+    public DLDag(JFactReasonerConfiguration options) {
+        this.options = options;
+        /** hash-table for verteces (and, all, LE) fast search */
+        DLVTable indexAnd = new DLVTable(this);
+        DLVTable indexAll = new DLVTable(this);
+        DLVTable indexLE = new DLVTable(this);
+        indexes.put(DagTag.COLLECTION, indexAnd);
+        indexes.put(DagTag.AND, indexAnd);
+        indexes.put(DagTag.IRR, indexAll);
+        indexes.put(DagTag.FORALL, indexAll);
+        indexes.put(DagTag.LE, indexLE);
+        nCacheHits = 0;
+        useDLVCache = true;
+        finalDagSize = 0;
+        heap.add(new DLVertex(DagTag.BAD, this));
+        heap.add(new DLVertex(DagTag.TOP, this));
+        if (!isCorrectOption(options.getORSortSat()) || !isCorrectOption(options.getORSortSub())) {
+            throw new OWLRuntimeException("DAG: wrong OR sorting options");
+        }
+    }
 
     /**
      * replace existing vertex at index I with a vertex V
@@ -72,13 +90,14 @@ public class DLDag implements Serializable {
      *        i
      * @param v
      *        v
-     * @param C
+     * @param c
      *        C
      */
     @PortedFrom(file = "dlDag.h", name = "replaceVertex")
-    public void replaceVertex(int i, DLVertex v, NamedEntry C) {
+    public void replaceVertex(int i, DLVertex v, NamedEntry c) {
         heap.set(i > 0 ? i : -i, v);
-        v.setConcept(C);
+        v.setConcept(c);
+        cache.clear();
     }
 
     /**
@@ -94,7 +113,7 @@ public class DLDag implements Serializable {
                 return i;
             }
         }
-        return bpINVALID;
+        return BP_INVALID;
     }
 
     /**
@@ -105,7 +124,7 @@ public class DLDag implements Serializable {
      * @return true if correct
      */
     @PortedFrom(file = "dlDag.h", name = "isCorrectOption")
-    private boolean isCorrectOption(String str) {
+    private static boolean isCorrectOption(@Nullable String str) {
         if (str == null) {
             return false;
         }
@@ -113,12 +132,9 @@ public class DLDag implements Serializable {
         if (n < 1 || n > 3) {
             return false;
         }
-        char Method = str.charAt(0), Order = n >= 2 ? str.charAt(1) : 'a', NGPref = n == 3 ? str
-                .charAt(2) : 'p';
-        return (Method == 'S' || Method == 'D' || Method == 'F'
-                || Method == 'B' || Method == 'G' || Method == '0')
-                && (Order == 'a' || Order == 'd')
-                && (NGPref == 'p' || NGPref == 'n');
+        char method = str.charAt(0), order = n >= 2 ? str.charAt(1) : 'a', ngPref = n == 3 ? str.charAt(2) : 'p';
+        return (method == 'S' || method == 'D' || method == 'F' || method == 'B' || method == 'G' || method == '0')
+            && (order == 'a' || order == 'd') && (ngPref == 'p' || ngPref == 'n');
     }
 
     /** change order of ADD elements wrt statistic */
@@ -132,9 +148,7 @@ public class DLDag implements Serializable {
     /** clear all DFS info from elements of DAG */
     @PortedFrom(file = "dlDag.h", name = "clearDFS")
     private void clearDFS() {
-        for (DLVertex d : heap) {
-            d.clearDFS();
-        }
+        heap.forEach(d -> d.clearDFS());
     }
 
     /**
@@ -151,7 +165,7 @@ public class DLDag implements Serializable {
             return;
         }
         indexes.get(tag).addElement(value);
-        if (tag == DagTag.dtCollection || tag == DagTag.dtAnd) {
+        if (tag == DagTag.COLLECTION || tag == DagTag.AND) {
             listAnds.add(value);
         }
     }
@@ -161,15 +175,31 @@ public class DLDag implements Serializable {
      * 
      * @param v
      *        v
+     * @param knownNew
+     *        true if new object is known to be required
      * @return size of heap
      */
     @PortedFrom(file = "dlDag.h", name = "directAdd")
-    public int directAdd(DLVertex v) {
-        int index = index(v.getConcept());
-        if (index != bpINVALID) {
-            return index;
+    public int directAdd(DLVertex v, boolean knownNew) {
+        if (knownNew) {
+            heap.add(v);
+            cache.add(v.getConcept());
+            // return an index of just added entry
+            return heap.size() - 1;
+        }
+        if (cache.isEmpty()) {
+            for (DLVertex v1 : heap) {
+                cache.add(v1.getConcept());
+            }
+        }
+        if (cache.contains(v.getConcept())) {
+            int index = index(v.getConcept());
+            if (index != BP_INVALID) {
+                return index;
+            }
         }
         heap.add(v);
+        cache.add(v.getConcept());
         // return an index of just added entry
         return heap.size() - 1;
     }
@@ -184,7 +214,7 @@ public class DLDag implements Serializable {
      */
     @PortedFrom(file = "dlDag.h", name = "directAddAndCache")
     public int directAddAndCache(DLVertex v) {
-        int ret = directAdd(v);
+        int ret = directAdd(v, false);
         if (useDLVCache) {
             updateIndex(v.getType(), ret);
         }
@@ -198,7 +228,8 @@ public class DLDag implements Serializable {
      */
     @PortedFrom(file = "dlDag.h", name = "isLast")
     public boolean isLast(int p) {
-        return p == heap.size() - 1 || -p == heap.size() - 1;
+        int last = heap.size() - 1;
+        return p == last || -p == last;
     }
 
     // access methods
@@ -224,13 +255,17 @@ public class DLDag implements Serializable {
         return heap.get(i < 0 ? -i : i);
     }
 
-    /** @return get size of DAG */
+    /**
+     * @return get size of DAG
+     */
     @PortedFrom(file = "dlDag.h", name = "size")
     public int size() {
         return heap.size();
     }
 
-    /** @return approximation of the size after query is added */
+    /**
+     * @return approximation of the size after query is added
+     */
     @PortedFrom(file = "dlDag.h", name = "maxSize")
     public int maxSize() {
         return size() + (size() < 220 ? 10 : size() / 20);
@@ -253,6 +288,7 @@ public class DLDag implements Serializable {
      *        p
      * @return cache for given BiPointer (may return null if no cache defined)
      */
+    @Nullable
     @PortedFrom(file = "dlDag.h", name = "getCache")
     public ModelCacheInterface getCache(int p) {
         return get(p).getCache(p > 0);
@@ -282,7 +318,7 @@ public class DLDag implements Serializable {
      */
     @PortedFrom(file = "dlDag.h", name = "merge")
     public void merge(MergableLabel ml, int p) {
-        if (p != bpINVALID && p != bpTOP && p != bpBOTTOM) {
+        if (p != BP_INVALID && p != BP_TOP && p != BP_BOTTOM) {
             get(p).merge(ml);
         }
     }
@@ -296,7 +332,7 @@ public class DLDag implements Serializable {
      */
     @PortedFrom(file = "dlDag.h", name = "haveSameSort")
     public boolean haveSameSort(int p, int q) {
-        if (options.isRKG_USE_SORTED_REASONING()) {
+        if (options.isUseSortedReasoning()) {
             assert p > 0 && q > 0;
             // everything has the same label as TOP
             if (p == 1 || q == 1) {
@@ -322,8 +358,8 @@ public class DLDag implements Serializable {
      */
     @PortedFrom(file = "dlDag.h", name = "PrintStat")
     public void printStat(LogAdapter o) {
-        o.printTemplate(Templates.PRINT_STAT, heap.size(), nCacheHits);
-        if (options.isRKG_PRINT_DAG_USAGE()) {
+        o.printTemplateInt(Templates.PRINT_STAT, heap.size(), nCacheHits);
+        if (options.isPrintDagUsage()) {
             printDAGUsage(o);
         }
     }
@@ -332,10 +368,7 @@ public class DLDag implements Serializable {
     public String toString() {
         StringBuilder o = new StringBuilder("\nDag structure");
         for (int i = 1; i < size(); ++i) {
-            o.append('\n');
-            o.append(i);
-            o.append(' ');
-            o.append(get(i));
+            o.append('\n').append(i).append(' ').append(get(i));
         }
         o.append('\n');
         return o.toString();
@@ -348,40 +381,15 @@ public class DLDag implements Serializable {
      */
     @PortedFrom(file = "dlDag.h", name = "add")
     public int add(DLVertex v) {
-        int ret = useDLVCache ? indexes.get(v.getType()).locate(v) : bpINVALID;
+        int ret = useDLVCache ? indexes.get(v.getType()).locate(v) : BP_INVALID;
         if (!isValid(ret)) {
+            // we fail to find such vertex -- it's new
             ret = directAddAndCache(v);
             return ret;
         }
         // node was found in cache
         ++nCacheHits;
         return ret;
-    }
-
-    /**
-     * @param Options
-     *        Options
-     */
-    public DLDag(JFactReasonerConfiguration Options) {
-        options = Options;
-        /** hash-table for verteces (and, all, LE) fast search */
-        DLVTable indexAnd = new DLVTable(this);
-        DLVTable indexAll = new DLVTable(this);
-        DLVTable indexLE = new DLVTable(this);
-        indexes.put(DagTag.dtCollection, indexAnd);
-        indexes.put(DagTag.dtAnd, indexAnd);
-        indexes.put(DagTag.dtIrr, indexAll);
-        indexes.put(DagTag.dtForall, indexAll);
-        indexes.put(DagTag.dtLE, indexLE);
-        nCacheHits = 0;
-        useDLVCache = true;
-        finalDagSize = 0;
-        heap.add(new DLVertex(DagTag.dtBad));
-        heap.add(new DLVertex(DagTag.dtTop));
-        if (!isCorrectOption(options.getORSortSat())
-                || !isCorrectOption(options.getORSortSub())) {
-            throw new OWLRuntimeException("DAG: wrong OR sorting options");
-        }
     }
 
     /** set the DAG size */
@@ -393,26 +401,28 @@ public class DLDag implements Serializable {
 
     /** clean query */
     @PortedFrom(file = "dlDag.h", name = "removeQuery")
+    @SuppressWarnings("incomplete-switch")
     public void removeQuery() {
         for (int i = size() - 1; i >= finalDagSize; --i) {
             DLVertex v = heap.get(i);
             switch (v.getType()) {
-                case dtDataType:
-                case dtDataExpr:
-                    ((DatatypeEntry) v.getConcept()).setIndex(bpINVALID);
+                case DATATYPE:
+                case DATAEXPR:
+                    ((DatatypeEntry) v.getConcept()).setIndex(BP_INVALID);
                     break;
-                case dtDataValue:
-                    ((LiteralEntry) v.getConcept()).setIndex(bpINVALID);
+                case DATAVALUE:
+                    ((LiteralEntry) v.getConcept()).setIndex(BP_INVALID);
                     break;
-                case dtPConcept:
-                case dtNConcept:
+                case PCONCEPT:
+                case NCONCEPT:
                     ((Concept) v.getConcept()).clear();
                     break;
                 default:
                     break;
             }
         }
-        resize(heap, finalDagSize);
+        resize(heap, finalDagSize, null);
+        cache.clear();
     }
 
     /**
@@ -424,14 +434,12 @@ public class DLDag implements Serializable {
     @PortedFrom(file = "dlDag.h", name = "setOrderDefaults")
     public void setOrderDefaults(String defSat, String defSub) {
         assert isCorrectOption(defSat) && isCorrectOption(defSub);
-        options.getLog().print("orSortSat: initial=", options.getORSortSat(),
-                ", default=", defSat);
+        options.getLog().print("orSortSat: initial=", options.getORSortSat(), ", default=", defSat);
         if (options.getORSortSat().charAt(0) == '0') {
             options.setorSortSat(defSat);
         }
         options.getLog().print(", used=", options.getORSortSat(), "\n");
-        options.getLog().print("orSortSub: initial=", options.getORSortSub(),
-                ", default=", defSub);
+        options.getLog().print("orSortSub: initial=", options.getORSortSub(), ", default=", defSub);
         if (options.getORSortSub().charAt(0) == '0') {
             options.setorSortSub(defSub);
         }
@@ -454,6 +462,7 @@ public class DLDag implements Serializable {
     }
 
     @PortedFrom(file = "dlDag.h", name = "computeVertexStat")
+    @SuppressWarnings("incomplete-switch")
     private void computeVertexStat(DLVertex v, boolean pos, int depth) {
         // in case of cycle: mark concept as such
         if (v.isVisited(pos)) {
@@ -464,14 +473,13 @@ public class DLDag implements Serializable {
         // ensure that the statistic is gather for all sub-concepts of the
         // expression
         switch (v.getType()) {
-            case dtCollection: // if pos then behaves like and
+            case COLLECTION:// if pos then behaves like and
                 if (!pos) {
                     break;
                 }
                 // fallthrough
                 //$FALL-THROUGH$
-            case dtAnd: // check all the conjuncts
-            case dtSplitConcept:
+            case AND:// check all the conjuncts
                 for (int q : v.begin()) {
                     int index = createBiPointer(q, pos);
                     DLVertex vertex = get(index);
@@ -481,19 +489,19 @@ public class DLDag implements Serializable {
                     }
                 }
                 break;
-            case dtProj:
+            case PROJ:
                 if (!pos) {
                     break;
                 }
                 // fallthrough
                 //$FALL-THROUGH$
-            case dtPConcept:
-            case dtNConcept:
-            case dtPSingleton:
-            case dtNSingleton:
-            case dtForall:
-            case dtChoose:
-            case dtLE: // check a single referenced concept
+            case PCONCEPT:
+            case NCONCEPT:
+            case PSINGLETON:
+            case NSINGLETON:
+            case FORALL:
+            case CHOOSE:
+            case LE:// check a single referenced concept
                 int index = createBiPointer(v.getConceptIndex(), pos);
                 DLVertex vertex = get(index);
                 boolean pos2 = index > 0;
@@ -501,7 +509,7 @@ public class DLDag implements Serializable {
                     computeVertexStat(vertex, pos2, depth + 1);
                 }
                 break;
-            default: // nothing to do
+            default:// nothing to do
                 break;
         }
         v.setProcessed(pos);
@@ -510,8 +518,9 @@ public class DLDag implements Serializable {
     }
 
     @PortedFrom(file = "dlDag.h", name = "updateVertexStat")
+    @SuppressWarnings("incomplete-switch")
     private void updateVertexStat(DLVertex v, boolean pos) {
-        int d = 0, s = 1, b = 0, g = 0;
+        int s = 1, b = 0, g = 0;
         if (!v.getType().omitStat(pos)) {
             if (isValid(v.getConceptIndex())) {
                 updateVertexStat(v, v.getConceptIndex(), pos);
@@ -522,15 +531,15 @@ public class DLDag implements Serializable {
             }
         }
         // correct values wrt POS
-        d = v.getDepth(pos);
+        int d = v.getDepth(pos);
         switch (v.getType()) {
-            case dtAnd:
+            case AND:
                 if (!pos) {
                     ++b;
                     // OR is branching
                 }
                 break;
-            case dtForall:
+            case FORALL:
                 ++d;
                 // increase depth
                 if (!pos) {
@@ -538,7 +547,7 @@ public class DLDag implements Serializable {
                     // SOME is generating
                 }
                 break;
-            case dtLE:
+            case LE:
                 ++d;
                 // increase depth
                 if (!pos) {
@@ -549,7 +558,7 @@ public class DLDag implements Serializable {
                     // <= is branching
                 }
                 break;
-            case dtProj:
+            case PROJ:
                 if (pos) {
                     ++b;
                     // projection sometimes involves branching
@@ -572,12 +581,14 @@ public class DLDag implements Serializable {
         DLVertex v = get(p);
         boolean pos = p > 0;
         if (v.isVisited(pos)) {
+            // avoid cycles
             return;
         }
         // increment frequence of current vertex
         v.incFreqValue(pos);
         v.setVisited(pos);
         if (v.getType().omitStat(pos)) {
+            // negation of primitive concept-like
             return;
         }
         // increment frequence of all subvertex
@@ -637,8 +648,7 @@ public class DLDag implements Serializable {
             }
         }
         // if necessary -- gather frequency
-        if (options.getORSortSat().charAt(0) != 'F'
-                && options.getORSortSub().charAt(0) != 'F') {
+        if (options.getORSortSat().charAt(0) != 'F' && options.getORSortSub().charAt(0) != 'F') {
             return;
         }
         clearDFS();
@@ -701,85 +711,68 @@ public class DLDag implements Serializable {
                 ++n;
             }
         }
-        o.printTemplate(Templates.PRINTDAGUSAGE, n, n * 100 / total, total);
+        o.printTemplateInt(Templates.PRINTDAGUSAGE, n, n * 100 / total, total);
     }
 
     /**
      * build the sort system for given TBox
      * 
-     * @param ORM
+     * @param orm
      *        ORM
-     * @param DRM
+     * @param drm
      *        DRM
      */
     @PortedFrom(file = "dlDag.h", name = "determineSorts")
-    public void determineSorts(RoleMaster ORM, RoleMaster DRM) {
+    public void determineSorts(RoleMaster orm, RoleMaster drm) {
         sortArraySize = heap.size();
         // init roles R&D sorts
-        List<Role> ORM_Begin = ORM.getRoles();
-        for (Role p : ORM_Begin) {
-            if (!p.isSynonym()) {
-                mergeSorts(p);
-            }
-        }
-        List<Role> DRM_Begin = DRM.getRoles();
-        for (Role p : DRM_Begin) {
-            if (!p.isSynonym()) {
-                mergeSorts(p);
-            }
-        }
-        for (int i = 2; i < heap.size(); ++i) {
-            mergeSorts(heap.get(i));
-        }
-        int sum = 0;
-        for (int i = 2; i < heap.size(); ++i) {
-            MergableLabel lab = heap.get(i).getSort();
+        List<Role> ormBegin = orm.getRoles();
+        ormBegin.stream().filter(p -> !p.isSynonym()).forEach(this::mergeSorts);
+        List<Role> drmBegin = drm.getRoles();
+        drmBegin.stream().filter(p -> !p.isSynonym()).forEach(this::mergeSorts);
+        heap.stream().skip(2).forEach(this::mergeSorts);
+        AtomicInteger sum = new AtomicInteger();
+        heap.stream().skip(2).forEach(p -> {
+            MergableLabel lab = p.getSort();
             lab.resolve();
             if (lab.isSample()) {
-                ++sum;
+                sum.incrementAndGet();
             }
-        }
-        for (Role p : ORM_Begin) {
-            if (!p.isSynonym()) {
-                MergableLabel lab = p.getDomainLabel();
-                lab.resolve();
-                if (lab.isSample()) {
-                    ++sum;
-                }
+        });
+        ormBegin.stream().filter(p -> !p.isSynonym()).forEach(p -> {
+            MergableLabel lab = p.getDomainLabel();
+            lab.resolve();
+            if (lab.isSample()) {
+                sum.incrementAndGet();
             }
-        }
-        for (Role p : DRM_Begin) {
-            if (!p.isSynonym()) {
-                MergableLabel lab = p.getDomainLabel();
-                lab.resolve();
-                if (lab.isSample()) {
-                    ++sum;
-                }
+        });
+        drmBegin.stream().filter(p -> !p.isSynonym()).forEach(p -> {
+            MergableLabel lab = p.getDomainLabel();
+            lab.resolve();
+            if (lab.isSample()) {
+                sum.incrementAndGet();
             }
-        }
+        });
         // we added a temp concept here; don't count it
-        if (sum > 0) {
-            sum--;
+        if (sum.get() > 0) {
+            sum.decrementAndGet();
         }
-        options.getLog().printTemplate(Templates.DETERMINE_SORTS,
-                sum > 0 ? sum : "no");
+        options.getLog().printTemplate(Templates.DETERMINE_SORTS, sum.get() > 0 ? sum : "no");
     }
 
     /**
      * merge sorts for a given role
      * 
-     * @param R
+     * @param r
      *        R
      */
     @PortedFrom(file = "dlDag.h", name = "mergeSorts")
-    private void mergeSorts(Role R) {
+    private void mergeSorts(Role r) {
         // associate role domain labels
-        R.mergeSupersDomain();
-        merge(R.getDomainLabel(), R.getBPDomain());
+        r.mergeSupersDomain();
+        merge(r.getDomainLabel(), r.getBPDomain());
         // also associate functional nodes (if any)
-        for (Role q : R.begin_topfunc()) {
-            merge(R.getDomainLabel(), q.getFunctional());
-        }
+        r.beginTopfunc().forEach(q -> merge(r.getDomainLabel(), q.getFunctional()));
     }
 
     /**
@@ -789,45 +782,44 @@ public class DLDag implements Serializable {
      *        v
      */
     @PortedFrom(file = "dlDag.h", name = "mergeSorts")
+    @SuppressWarnings("incomplete-switch")
     private void mergeSorts(DLVertex v) {
         switch (v.getType()) {
-            case dtLE: // set R&D for role
-            case dtForall:
-                v.merge(v.getRole().getDomainLabel()); // domain(role)=cur
+            case LE:// set R&D for role
+            case FORALL:
+                v.merge(v.getRole().getDomainLabel());// domain(role)=cur
                 merge(v.getRole().getRangeLabel(), v.getConceptIndex());
                 break;
-            case dtProj: // projection: equate R&D of R and ProjR, and D(R) with
-                         // C
+            case PROJ:// projection: equate R&D of R and ProjR, and D(R) with
+                      // C
                 v.merge(v.getRole().getDomainLabel());
                 v.merge(v.getProjRole().getDomainLabel());
                 merge(v.getRole().getDomainLabel(), v.getConceptIndex());
-                v.getRole().getRangeLabel()
-                        .merge(v.getProjRole().getRangeLabel());
+                v.getRole().getRangeLabel().merge(v.getProjRole().getRangeLabel());
                 break;
-            case dtIrr: // equate R&D for role
+            case IRR:// equate R&D for role
                 v.merge(v.getRole().getDomainLabel());
                 v.merge(v.getRole().getRangeLabel());
                 break;
-            case dtAnd:
-            case dtCollection:
-            case dtSplitConcept:
+            case AND:
+            case COLLECTION:
                 for (int q : v.begin()) {
                     merge(v.getSort(), q);
                 }
                 break;
-            case dtNSingleton:
-            case dtPSingleton:
-            case dtPConcept:
-            case dtNConcept: // merge with description
-            case dtChoose:
+            case NSINGLETON:
+            case PSINGLETON:
+            case PCONCEPT:
+            case NCONCEPT:// merge with description
+            case CHOOSE:
                 merge(v.getSort(), v.getConceptIndex());
                 break;
-            case dtDataType: // nothing to do
-            case dtDataValue:
-            case dtDataExpr:
-            case dtNN:
+            case DATATYPE:// nothing to do
+            case DATAVALUE:
+            case DATAEXPR:
+            case NN:
                 break;
-            case dtTop:
+            case TOP:
             default:
                 throw new UnreachableSituationException();
         }
@@ -838,14 +830,14 @@ public class DLDag implements Serializable {
      * 
      * @param a
      *        a
-     * @param R
+     * @param d
      *        R
      * @param b
      *        b
      */
     @PortedFrom(file = "dlDag.h", name = "updateSorts")
-    public void updateSorts(int a, Role R, int b) {
-        merge(R.getDomainLabel(), a);
-        merge(R.getRangeLabel(), b);
+    public void updateSorts(int a, Role d, int b) {
+        merge(d.getDomainLabel(), a);
+        merge(d.getRangeLabel(), b);
     }
 }

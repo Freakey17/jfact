@@ -10,7 +10,7 @@ import java.io.Serializable;
 /** Timer */
 public class Timer implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
+
     /** save the starting time of the timer */
     private long startTime;
     /** calculated time between Start() and Stop() calls */
@@ -18,7 +18,7 @@ public class Timer implements Serializable {
     /** flag to show timer is started */
     private boolean started;
 
-    /** default constructor */
+    /** Default constructor. */
     public Timer() {
         startTime = 0;
         resultTime = 0;
@@ -34,7 +34,7 @@ public class Timer implements Serializable {
     /** @return delta */
     public long calcDelta() {
         long finishTime = System.currentTimeMillis();
-        // calculate difference between cuttent time and start time
+        // calculate difference between current time and start time
         return finishTime - startTime;
     }
 

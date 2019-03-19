@@ -1,20 +1,15 @@
 package uk.ac.manchester.cs.jfact.kernel.actors;
 
-/* This file is part of the JFact DL reasoner
- Copyright 2011-2013 by Ignazio Palmisano, Dmitry Tsarkov, University of Manchester
- This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
- This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.ClassifiableEntry;
-import uk.ac.manchester.cs.jfact.kernel.ExpressionManager;
+import uk.ac.manchester.cs.jfact.kernel.ExpressionCache;
 import uk.ac.manchester.cs.jfact.kernel.TaxonomyVertex;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.Expression;
-import conformance.PortedFrom;
 
 /**
  * class for acting with concept taxonomy
@@ -23,32 +18,40 @@ import conformance.PortedFrom;
  *        type
  */
 @PortedFrom(file = "JNIActor.h", name = "TaxonomyActor")
-public class TaxonomyActor<T extends Expression> implements Actor, Serializable {
+public class TaxonomyActor<T extends Expression> extends TaxGatheringWalker {
 
-    private static final long serialVersionUID = 11000L;
     private final Policy policy;
-    private final ExpressionManager expressionManager;
+    private final ExpressionCache cache;
     /** 2D array to return */
-    @PortedFrom(file = "JNIActor.h", name = "acc")
-    private final List<List<T>> acc = new ArrayList<List<T>>();
+    @PortedFrom(file = "JNIActor.h", name = "acc") private final List<List<T>> acc = new ArrayList<>();
     /** 1D array to return */
-    @PortedFrom(file = "JNIActor.h", name = "plain")
-    private final List<T> plain = new ArrayList<T>();
+    @PortedFrom(file = "JNIActor.h", name = "plain") private final List<T> plain = new ArrayList<>();
     /** temporary vector to keep synonyms */
-    @PortedFrom(file = "JNIActor.h", name = "syn")
-    private final List<T> syn = new ArrayList<T>();
+    @PortedFrom(file = "JNIActor.h", name = "syn") private final List<T> syn = new ArrayList<>();
+
+    /**
+     * @param em
+     *        em
+     * @param p
+     *        p
+     */
+    @PortedFrom(file = "JNIActor.h", name = "TaxonomyActor")
+    public TaxonomyActor(ExpressionCache em, Policy p) {
+        cache = em;
+        policy = p;
+    }
 
     @Override
     public boolean applicable(TaxonomyVertex v) {
-        if (policy.applicable(v.getPrimer())) {
+        if (applicable(v.getPrimer())) {
             return true;
         }
-        for (ClassifiableEntry p : v.synonyms()) {
-            if (policy.applicable(p)) {
-                return true;
-            }
-        }
-        return false;
+        return v.synonyms().anyMatch(this::applicable);
+    }
+
+    @Override
+    protected boolean applicable(ClassifiableEntry entry) {
+        return policy.applicable(entry);
     }
 
     /**
@@ -57,15 +60,14 @@ public class TaxonomyActor<T extends Expression> implements Actor, Serializable 
      * @param p
      *        p
      */
-    @SuppressWarnings("unchecked")
+    @Override
     @PortedFrom(file = "JNIActor.h", name = "tryEntry")
-    protected void tryEntry(ClassifiableEntry p) {
-        if (p.isSystem()) {
-            return;
-        }
-        if (policy.applicable(p)) {
+    protected boolean tryEntry(ClassifiableEntry p) {
+        if (!p.isSystem() && applicable(p)) {
             syn.add(asT(p));
+            return true;
         }
+        return false;
     }
 
     /**
@@ -75,19 +77,7 @@ public class TaxonomyActor<T extends Expression> implements Actor, Serializable 
      */
     @SuppressWarnings("unchecked")
     protected T asT(ClassifiableEntry p) {
-        return (T) policy.buildTree(expressionManager, p);
-    }
-
-    /**
-     * @param em
-     *        em
-     * @param p
-     *        p
-     */
-    @PortedFrom(file = "JNIActor.h", name = "TaxonomyActor")
-    public TaxonomyActor(ExpressionManager em, Policy p) {
-        expressionManager = em;
-        policy = p;
+        return (T) policy.buildTree(cache, p);
     }
 
     @Override
@@ -110,15 +100,10 @@ public class TaxonomyActor<T extends Expression> implements Actor, Serializable 
     /** @return 2D array of all required elements of the taxonomy */
     @PortedFrom(file = "JNIActor.h", name = "getElements")
     public List<Collection<T>> getElements() {
-        List<Collection<T>> toReturn = new ArrayList<Collection<T>>();
         if (policy.needPlain()) {
-            toReturn.add(plain);
-        } else {
-            for (int i = 0; i < acc.size(); ++i) {
-                toReturn.add(acc.get(i));
-            }
+            return Collections.singletonList(plain);
         }
-        return toReturn;
+        return new ArrayList<>(acc);
     }
 
     @Override
@@ -126,9 +111,7 @@ public class TaxonomyActor<T extends Expression> implements Actor, Serializable 
     public boolean apply(TaxonomyVertex v) {
         syn.clear();
         tryEntry(v.getPrimer());
-        for (ClassifiableEntry p : v.synonyms()) {
-            tryEntry(p);
-        }
+        v.synonyms().forEach(this::tryEntry);
         /** no applicable elements were found */
         if (syn.isEmpty()) {
             return false;
@@ -136,25 +119,25 @@ public class TaxonomyActor<T extends Expression> implements Actor, Serializable 
         if (policy.needPlain()) {
             plain.addAll(syn);
         } else {
-            acc.add(new ArrayList<T>(syn));
+            acc.add(new ArrayList<>(syn));
         }
         return true;
     }
 
     @Override
     public void removePastBoundaries(Collection<TaxonomyVertex> pastBoundary) {
-        List<T> entries = new ArrayList<T>();
-        for (TaxonomyVertex t : pastBoundary) {
-            entries.add(asT(t.getPrimer()));
-            TaxonomyVertex t1 = t.getSynonymNode();
-            while (t1 != null) {
-                entries.add(asT(t1.getPrimer()));
-                t1 = t1.getSynonymNode();
-            }
-        }
+        List<T> entries = new ArrayList<>();
+        pastBoundary.forEach(t -> removePastBoundaries(entries, t));
         plain.removeAll(entries);
-        for (List<T> l : acc) {
-            l.removeAll(entries);
+        acc.forEach(l -> l.removeAll(entries));
+    }
+
+    protected void removePastBoundaries(List<T> entries, TaxonomyVertex t) {
+        entries.add(asT(t.getPrimer()));
+        TaxonomyVertex t1 = t.getSynonymNode();
+        while (t1 != null) {
+            entries.add(asT(t1.getPrimer()));
+            t1 = t1.getSynonymNode();
         }
     }
 }

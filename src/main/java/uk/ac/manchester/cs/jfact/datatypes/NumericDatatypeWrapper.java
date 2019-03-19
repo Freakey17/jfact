@@ -11,13 +11,14 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import org.semanticweb.owlapi.model.IRI;
 
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
 
-class NumericDatatypeWrapper<O extends Comparable<O>> implements
-        NumericDatatype<O>, OrderedDatatype<O> {
+class NumericDatatypeWrapper<O extends Comparable<O>> implements NumericDatatype<O>, OrderedDatatype<O> {
 
     private final Datatype<O> d;
 
@@ -67,13 +68,13 @@ class NumericDatatypeWrapper<O extends Comparable<O>> implements
         return this.d.getKnownNumericFacetValues();
     }
 
+    @Nullable
     @Override
-    public <T extends Comparable<T>> T getFacetValue(Facet<T> f) {
-        T o = this.d.getFacetValue(f);
-        return o;
+    public Comparable getFacetValue(Facet f) {
+        return this.d.getFacetValue(f);
     }
 
-    @SuppressWarnings("rawtypes")
+    @Nullable
     @Override
     public Comparable getNumericFacetValue(Facet f) {
         return this.d.getNumericFacetValue(f);
@@ -174,7 +175,7 @@ class NumericDatatypeWrapper<O extends Comparable<O>> implements
         return this.hasMaxInclusive() || this.hasMaxExclusive();
     }
 
-    @SuppressWarnings("unchecked")
+    @Nullable
     @Override
     public O getMin() {
         if (this.hasMinExclusive()) {
@@ -186,7 +187,7 @@ class NumericDatatypeWrapper<O extends Comparable<O>> implements
         return null;
     }
 
-    @SuppressWarnings("unchecked")
+    @Nullable
     @Override
     public O getMax() {
         if (this.hasMaxExclusive()) {
@@ -224,7 +225,12 @@ class NumericDatatypeWrapper<O extends Comparable<O>> implements
     }
 
     @Override
-    public IRI getName() {
-        return IRI.create(toString());
+    public IRI getIRI() {
+        return IRI.create("numeric(" + d + ")");
+    }
+
+    @Override
+    public String toString() {
+        return getIRI().toString();
     }
 }

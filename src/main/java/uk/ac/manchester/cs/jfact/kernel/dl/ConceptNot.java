@@ -9,27 +9,25 @@ import java.io.Serializable;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptArg;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.PortedFrom;
 
 /** concept negation */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptNot")
 public class ConceptNot implements ConceptExpression, ConceptArg, Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** concept argument */
-    @PortedFrom(file = "tDLExpression.h", name = "C")
-    private final ConceptExpression conceptExpression;
+    @PortedFrom(file = "tDLExpression.h", name = "C") private final ConceptExpression conceptExpression;
 
     /**
-     * @param C
+     * @param c
      *        C
      */
-    public ConceptNot(ConceptExpression C) {
-        conceptExpression = C;
+    public ConceptNot(ConceptExpression c) {
+        conceptExpression = c;
     }
 
     @Override
@@ -52,7 +50,12 @@ public class ConceptNot implements ConceptExpression, ConceptArg, Serializable {
     }
 
     @Override
-    public IRI getName() {
-        return IRI.create(toString());
+    public IRI getIRI() {
+        return IRI.create("not(" + conceptExpression + ")");
+    }
+
+    @Override
+    public String toString() {
+        return getIRI().toString();
     }
 }

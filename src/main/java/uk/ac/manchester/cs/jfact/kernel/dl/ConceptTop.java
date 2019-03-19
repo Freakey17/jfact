@@ -7,19 +7,19 @@ package uk.ac.manchester.cs.jfact.kernel.dl;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.io.Serializable;
 
+import javax.annotation.Nullable;
+
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.vocab.OWLRDFVocabulary;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.PortedFrom;
 
 /** top */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptTop")
 public class ConceptTop implements ConceptExpression, Serializable {
-
-    private static final long serialVersionUID = 11000L;
 
     @Override
     @PortedFrom(file = "tDLExpression.h", name = "accept")
@@ -35,11 +35,27 @@ public class ConceptTop implements ConceptExpression, Serializable {
 
     @Override
     public String toString() {
-        return getName().toString();
+        return getIRI().toString();
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return OWLRDFVocabulary.OWL_THING.getIRI();
+    }
+
+    @Override
+    public int hashCode() {
+        return 1;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (this == obj) {
+            return true;
+        }
+        return obj instanceof ConceptTop;
     }
 }

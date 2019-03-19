@@ -9,41 +9,35 @@ import java.io.Serializable;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptObjectCardinalityExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.NumberArg;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ObjectRoleExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** object max cardinality */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptObjectMaxCardinality")
-public class ConceptObjectMaxCardinality implements
-        ConceptObjectCardinalityExpression, NumberArg, Serializable {
+public class ConceptObjectMaxCardinality implements ConceptObjectCardinalityExpression, NumberArg, Serializable {
 
-    private static final long serialVersionUID = 11000L;
-    @Original
-    private final ConceptExpression delegate;
-    @PortedFrom(file = "tDLExpression.h", name = "N")
-    private final int N;
-    @Original
-    private final ObjectRoleExpression roleDelegate;
+    @Original private final ConceptExpression delegate;
+    @PortedFrom(file = "tDLExpression.h", name = "N") private final int n;
+    @Original private final ObjectRoleExpression roleDelegate;
 
     /**
      * @param n
      *        n
-     * @param R
+     * @param r
      *        R
-     * @param C
+     * @param c
      *        C
      */
-    public ConceptObjectMaxCardinality(int n, ObjectRoleExpression R,
-            ConceptExpression C) {
-        N = n;
-        delegate = C;
-        roleDelegate = R;
+    public ConceptObjectMaxCardinality(int n, ObjectRoleExpression r, ConceptExpression c) {
+        this.n = n;
+        delegate = c;
+        roleDelegate = r;
     }
 
     @Override
@@ -61,7 +55,7 @@ public class ConceptObjectMaxCardinality implements
     @Override
     @PortedFrom(file = "tDLExpression.h", name = "getNumber")
     public int getCardinality() {
-        return N;
+        return n;
     }
 
     @Override
@@ -77,7 +71,12 @@ public class ConceptObjectMaxCardinality implements
     }
 
     @Override
-    public IRI getName() {
-        return IRI.create(toString());
+    public IRI getIRI() {
+        return IRI.create("objectMaxCardinality(" + roleDelegate + " " + delegate + ")");
+    }
+
+    @Override
+    public String toString() {
+        return getIRI().toString();
     }
 }

@@ -2,32 +2,17 @@ package uk.ac.manchester.cs.jfact.datatypes;
 
 import java.math.BigDecimal;
 
-import org.semanticweb.owlapi.model.IRI;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
-/* This file is part of the JFact DL reasoner
- Copyright 2011-2013 by Ignazio Palmisano, Dmitry Tsarkov, University of Manchester
- This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
- This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
-import uk.ac.manchester.cs.jfact.datatypes.DatatypeFactory.ABSTRACT_NUMERIC_DATATYPE;
+class DatatypeNumericExpressionImpl<O extends Comparable<O>> extends AbstractNumericDatatype<O>
+    implements DatatypeExpression<O> {
 
-class DatatypeNumericExpressionImpl<O extends Comparable<O>> extends
-        ABSTRACT_NUMERIC_DATATYPE<O> implements DatatypeExpression<O> {
-
-    private static final long serialVersionUID = 11000L;
-    // TODO handle all value space restrictions in the delegations
-    private final Datatype<O> host;
+    @Nonnull private final Datatype<O> host;
 
     public DatatypeNumericExpressionImpl(Datatype<O> b) {
-        super(
-                IRI.create(b.getDatatypeIRI() + "_"
-                        + DatatypeFactory.getIndex()), b.getFacets());
-        if (b.isExpression()) {
-            this.host = b.asExpression().getHostType();
-        } else {
-            this.host = b;
-        }
-        ancestors = Utils.generateAncestors(this.host);
+        super(DatatypeFactory.getIndex(b.getDatatypeIRI() + "_"), b.getFacets(), Utils.generateAncestors(b.host()));
+        this.host = b.host();
         knownNumericFacetValues.putAll(b.getKnownNumericFacetValues());
         knownNonNumericFacetValues.putAll(b.getKnownNonNumericFacetValues());
     }
@@ -43,22 +28,18 @@ class DatatypeNumericExpressionImpl<O extends Comparable<O>> extends
     }
 
     @Override
-    public DatatypeExpression<O> addNumericFacet(Facet f, Comparable<?> value) {
+    public DatatypeExpression<O> addNumericFacet(Facet f, @Nullable Comparable<?> value) {
         if (!facets.contains(f)) {
-            throw new IllegalArgumentException("Facet " + f
-                    + " not allowed tor datatype " + this.getHostType());
+            throw new IllegalArgumentException("Facet " + f + " not allowed tor datatype " + this.getHostType());
         }
         if (value == null) {
             throw new IllegalArgumentException("Value cannot be null");
         }
-        if (value instanceof Literal
-                && !this.host.isCompatible((Literal<?>) value)) {
+        if (value instanceof Literal && !this.host.isCompatible((Literal<?>) value)) {
             throw new IllegalArgumentException(
-                    "Not a valid value for this expression: " + f + '\t'
-                            + value + " for: " + this);
+                "Not a valid value for this expression: " + f + '\t' + value + " for: " + this);
         }
-        DatatypeNumericExpressionImpl<O> toReturn = new DatatypeNumericExpressionImpl<O>(
-                this.host);
+        DatatypeNumericExpressionImpl<O> toReturn = new DatatypeNumericExpressionImpl<>(this.host);
         toReturn.knownNumericFacetValues.putAll(knownNumericFacetValues);
         toReturn.knownNonNumericFacetValues.putAll(knownNonNumericFacetValues);
         // cannot have noth min/maxInclusive and min/maxExclusive values, so
@@ -72,8 +53,7 @@ class DatatypeNumericExpressionImpl<O extends Comparable<O>> extends
             toReturn.knownNumericFacetValues.remove(Facets.maxInclusive);
         }
         if (value instanceof Number) {
-            toReturn.knownNumericFacetValues.put(f,
-                    new BigDecimal(value.toString()));
+            toReturn.knownNumericFacetValues.put(f, new BigDecimal(value.toString()));
         } else {
             toReturn.knownNumericFacetValues.put(f, value);
         }
@@ -81,23 +61,18 @@ class DatatypeNumericExpressionImpl<O extends Comparable<O>> extends
     }
 
     @Override
-    public DatatypeExpression<O>
-            addNonNumericFacet(Facet f, Comparable<?> value) {
+    public DatatypeExpression<O> addNonNumericFacet(Facet f, @Nullable Comparable<?> value) {
         if (!facets.contains(f)) {
-            throw new IllegalArgumentException("Facet " + f
-                    + " not allowed tor datatype " + this.getHostType());
+            throw new IllegalArgumentException("Facet " + f + " not allowed tor datatype " + this.getHostType());
         }
         if (value == null) {
             throw new IllegalArgumentException("Value cannot be null");
         }
-        if (value instanceof Literal
-                && !this.host.isCompatible((Literal<?>) value)) {
+        if (value instanceof Literal && !this.host.isCompatible((Literal<?>) value)) {
             throw new IllegalArgumentException(
-                    "Not a valid value for this expression: " + f + '\t'
-                            + value + " for: " + this);
+                "Not a valid value for this expression: " + f + '\t' + value + " for: " + this);
         }
-        DatatypeNumericExpressionImpl<O> toReturn = new DatatypeNumericExpressionImpl<O>(
-                this.host);
+        DatatypeNumericExpressionImpl<O> toReturn = new DatatypeNumericExpressionImpl<>(this.host);
         toReturn.knownNumericFacetValues.putAll(knownNumericFacetValues);
         toReturn.knownNonNumericFacetValues.putAll(knownNonNumericFacetValues);
         toReturn.knownNonNumericFacetValues.put(f, value);
@@ -155,7 +130,6 @@ class DatatypeNumericExpressionImpl<O extends Comparable<O>> extends
 
     @Override
     public String toString() {
-        return "numeric(" + this.host.toString() + "(extra facets:" + getMin()
-                + ' ' + getMax() + "))";
+        return "numeric(" + this.host.toString() + "(extra facets:" + getMin() + ' ' + getMax() + "))";
     }
 }

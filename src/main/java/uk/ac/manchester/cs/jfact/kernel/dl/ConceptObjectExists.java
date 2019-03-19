@@ -9,35 +9,31 @@ import java.io.Serializable;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptObjectRCExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ObjectRoleExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** object exist restriction */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptObjectExists")
-public class ConceptObjectExists implements ConceptObjectRCExpression,
-        Serializable {
+public class ConceptObjectExists implements ConceptObjectRCExpression, Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** concept argument */
-    @PortedFrom(file = "tDLExpression.h", name = "C")
-    private final ConceptExpression conceptExpression;
-    @Original
-    private final ObjectRoleExpression delegate;
+    @PortedFrom(file = "tDLExpression.h", name = "C") private final ConceptExpression conceptExpression;
+    @Original private final ObjectRoleExpression delegate;
 
     /**
-     * @param R
+     * @param r
      *        R
-     * @param C
+     * @param c
      *        C
      */
-    public ConceptObjectExists(ObjectRoleExpression R, ConceptExpression C) {
-        conceptExpression = C;
-        delegate = R;
+    public ConceptObjectExists(ObjectRoleExpression r, ConceptExpression c) {
+        conceptExpression = c;
+        delegate = r;
     }
 
     @Override
@@ -66,7 +62,12 @@ public class ConceptObjectExists implements ConceptObjectRCExpression,
     }
 
     @Override
-    public IRI getName() {
-        return IRI.create(toString());
+    public IRI getIRI() {
+        return IRI.create("objectExists(" + delegate + " " + conceptExpression + ")");
+    }
+
+    @Override
+    public String toString() {
+        return getIRI().toString();
     }
 }

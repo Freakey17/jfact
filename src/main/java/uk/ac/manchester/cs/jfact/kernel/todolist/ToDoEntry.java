@@ -7,19 +7,20 @@ package uk.ac.manchester.cs.jfact.kernel.todolist;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.io.Serializable;
 
+import org.roaringbitmap.RoaringBitmap;
+
 import uk.ac.manchester.cs.jfact.dep.DepSet;
-import uk.ac.manchester.cs.jfact.helpers.FastSetSimple;
 import uk.ac.manchester.cs.jfact.kernel.ConceptWDep;
 import uk.ac.manchester.cs.jfact.kernel.DlCompletionTree;
 
 /** the entry of Todo table */
 public class ToDoEntry implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
+
     /** node to include concept */
     private final DlCompletionTree node;
     private final int concept;
-    private final FastSetSimple delegate;
+    private final RoaringBitmap delegate;
 
     protected ToDoEntry(DlCompletionTree n, ConceptWDep off) {
         node = n;
@@ -38,13 +39,13 @@ public class ToDoEntry implements Serializable {
     }
 
     /** @return offset dep set */
-    public FastSetSimple getOffsetDepSet() {
+    public RoaringBitmap getOffsetDepSet() {
         return delegate;
     }
 
     @Override
     public String toString() {
         return "Node(" + node.getId() + "), offset("
-                + new ConceptWDep(concept, DepSet.create(delegate)) + ')';
+            + new ConceptWDep(concept, DepSet.create(delegate)) + ')';
     }
 }

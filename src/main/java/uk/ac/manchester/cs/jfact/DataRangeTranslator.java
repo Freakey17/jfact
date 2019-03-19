@@ -1,40 +1,29 @@
 package uk.ac.manchester.cs.jfact;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import static org.semanticweb.owlapi.util.OWLAPIStreamUtils.asList;
+import static uk.ac.manchester.cs.jfact.kernel.ExpressionManager.*;
 
-import org.semanticweb.owlapi.model.OWLDataComplementOf;
-import org.semanticweb.owlapi.model.OWLDataFactory;
-import org.semanticweb.owlapi.model.OWLDataIntersectionOf;
-import org.semanticweb.owlapi.model.OWLDataOneOf;
-import org.semanticweb.owlapi.model.OWLDataRange;
-import org.semanticweb.owlapi.model.OWLDataRangeVisitorEx;
-import org.semanticweb.owlapi.model.OWLDataUnionOf;
-import org.semanticweb.owlapi.model.OWLDatatype;
-import org.semanticweb.owlapi.model.OWLDatatypeRestriction;
-import org.semanticweb.owlapi.model.OWLFacetRestriction;
-import org.semanticweb.owlapi.model.OWLLiteral;
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Stream;
+
+import javax.annotation.Nullable;
+
+import org.semanticweb.owlapi.model.*;
+import org.semanticweb.owlapi.reasoner.Node;
 import org.semanticweb.owlapi.reasoner.impl.DefaultNode;
 import org.semanticweb.owlapi.reasoner.impl.DefaultNodeSet;
 import org.semanticweb.owlapi.reasoner.impl.OWLDatatypeNode;
 import org.semanticweb.owlapi.reasoner.impl.OWLDatatypeNodeSet;
 
-import uk.ac.manchester.cs.jfact.datatypes.Datatype;
-import uk.ac.manchester.cs.jfact.datatypes.DatatypeExpression;
-import uk.ac.manchester.cs.jfact.datatypes.DatatypeFactory;
-import uk.ac.manchester.cs.jfact.datatypes.Facet;
-import uk.ac.manchester.cs.jfact.datatypes.Facets;
-import uk.ac.manchester.cs.jfact.datatypes.Literal;
-import uk.ac.manchester.cs.jfact.kernel.ExpressionManager;
+import uk.ac.manchester.cs.jfact.datatypes.*;
+import uk.ac.manchester.cs.jfact.kernel.ExpressionCache;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpression;
 
 /** datarange translator */
-public class DataRangeTranslator extends
-        OWLEntityTranslator<OWLDatatype, DataExpression> implements
-        OWLDataRangeVisitorEx<DataExpression> {
+public class DataRangeTranslator extends OWLEntityTranslator<OWLDatatype, DataExpression>
+    implements OWLDataRangeVisitorEx<DataExpression> {
 
-    private static final long serialVersionUID = 11000L;
     private final DatatypeFactory f;
 
     /**
@@ -47,40 +36,43 @@ public class DataRangeTranslator extends
      * @param f
      *        f
      */
-    public DataRangeTranslator(ExpressionManager em, OWLDataFactory df,
-            TranslationMachinery tr, DatatypeFactory f) {
+    public DataRangeTranslator(ExpressionCache em, OWLDataFactory df, TranslationMachinery tr, DatatypeFactory f) {
         super(em, df, tr);
         this.f = f;
     }
 
+    @Nullable
     @Override
     protected DataExpression getTopEntityPointer() {
-        return em.dataTop();
+        return dataTop();
     }
 
+    @Nullable
     @Override
     protected DataExpression getBottomEntityPointer() {
         return null;
     }
 
     @Override
-    protected DefaultNode<OWLDatatype> createDefaultNode() {
-        return new OWLDatatypeNode();
+    protected DefaultNode<OWLDatatype> createDefaultNode(Stream<OWLDatatype> stream) {
+        return new OWLDatatypeNode(stream);
     }
 
+    @Nullable
     @Override
     protected OWLDatatype getTopEntity() {
         return df.getTopDatatype();
     }
 
+    @Nullable
     @Override
     protected OWLDatatype getBottomEntity() {
         return null;
     }
 
     @Override
-    protected DefaultNodeSet<OWLDatatype> createDefaultNodeSet() {
-        return new OWLDatatypeNodeSet();
+    protected DefaultNodeSet<OWLDatatype> createDefaultNodeSet(Stream<Node<OWLDatatype>> stream) {
+        return new OWLDatatypeNodeSet(stream);
     }
 
     @Override
@@ -95,55 +87,45 @@ public class DataRangeTranslator extends
 
     @Override
     public DataExpression visit(OWLDataOneOf node) {
-        List<Literal<?>> l = new ArrayList<Literal<?>>();
-        for (OWLLiteral literal : node.getValues()) {
-            l.add(tr.pointer(literal));
-        }
-        return em.dataOneOf(l);
+        return dataOneOf(asList(node.values().map(tr::pointer)));
     }
 
     @Override
     public DataExpression visit(OWLDataComplementOf node) {
-        return em.dataNot(node.getDataRange().accept(this));
+        return dataNot(node.getDataRange().accept(this));
     }
 
     @Override
     public DataExpression visit(OWLDataIntersectionOf node) {
-        return em.dataAnd(translateDataRangeSet(node.getOperands()));
+        return dataAnd(translateDataRangeSet(node.operands()));
     }
 
-    private List<DataExpression> translateDataRangeSet(
-            Set<OWLDataRange> dataRanges) {
-        List<DataExpression> l = new ArrayList<DataExpression>();
-        for (OWLDataRange op : dataRanges) {
-            l.add(op.accept(this));
-        }
-        return l;
+    private List<DataExpression> translateDataRangeSet(Stream<? extends OWLDataRange> dataRanges) {
+        return asList(dataRanges.map(op -> op.accept(this)));
     }
 
     @Override
     public DataExpression visit(OWLDataUnionOf node) {
-        return em.dataOr(translateDataRangeSet(node.getOperands()));
+        return dataOr(translateDataRangeSet(node.operands()));
     }
 
     @Override
     public DataExpression visit(OWLDatatypeRestriction node) {
         Datatype<?> type = f.getKnownDatatype(node.getDatatype().getIRI());
-        Set<OWLFacetRestriction> facetRestrictions = node
-                .getFacetRestrictions();
-        if (facetRestrictions.isEmpty()) {
+        Iterator<OWLFacetRestriction> facetRestrictions = node.facetRestrictions().iterator();
+        if (!facetRestrictions.hasNext()) {
             return type;
         }
-        DatatypeExpression<?> toReturn = null;
+        DatatypeExpression<?> toReturn;
         if (type.isNumericDatatype()) {
-            toReturn = DatatypeFactory.getNumericDatatypeExpression(type
-                    .asNumericDatatype());
+            toReturn = type.wrapAsNumericExpression();
         } else if (type.isOrderedDatatype()) {
-            toReturn = DatatypeFactory.getOrderedDatatypeExpression(type);
+            toReturn = type.wrapAsOrderedExpression();
         } else {
-            toReturn = DatatypeFactory.getDatatypeExpression(type);
+            toReturn = type.wrapAsDatatypeExpression();
         }
-        for (OWLFacetRestriction restriction : facetRestrictions) {
+        while (facetRestrictions.hasNext()) {
+            OWLFacetRestriction restriction = facetRestrictions.next();
             Literal<?> dv = tr.pointer(restriction.getFacetValue());
             Facet facet = Facets.parse(restriction.getFacet());
             if (facet.isNumberFacet()) {

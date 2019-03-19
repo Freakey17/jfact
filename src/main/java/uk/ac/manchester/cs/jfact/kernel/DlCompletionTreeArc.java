@@ -7,16 +7,17 @@ package uk.ac.manchester.cs.jfact.kernel;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.io.Serializable;
 
+import javax.annotation.Nullable;
+
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.dep.DepSet;
 import uk.ac.manchester.cs.jfact.helpers.LogAdapter;
 import uk.ac.manchester.cs.jfact.helpers.Templates;
-import conformance.PortedFrom;
 
 /** completion tree arc */
 @PortedFrom(file = "dlCompletionTreeArc.h", name = "DlCompletionTreeArc")
 public class DlCompletionTreeArc implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** pointer to "to" node */
     private final DlCompletionTree node;
     /** role, labelling given arc */
@@ -35,7 +36,6 @@ public class DlCompletionTreeArc implements Serializable {
     /** class for restoring edge */
     static class EdgeRestorer extends Restorer {
 
-        private static final long serialVersionUID = 11000L;
         private final DlCompletionTreeArc arc;
         private final Role role;
 
@@ -54,7 +54,6 @@ public class DlCompletionTreeArc implements Serializable {
     /** class for restoring dep-set */
     static class EdgeDepRestorer extends Restorer {
 
-        private static final long serialVersionUID = 11000L;
         private final DlCompletionTreeArc arc;
         private final DepSet dep;
 
@@ -67,17 +66,6 @@ public class DlCompletionTreeArc implements Serializable {
         public void restore() {
             arc.depSet = DepSet.create(dep);
         }
-    }
-
-    /**
-     * set given arc as a reverse of current
-     * 
-     * @param v
-     *        v
-     */
-    public void setReverse(DlCompletionTreeArc v) {
-        reverse = v;
-        v.reverse = this;
     }
 
     /**
@@ -95,7 +83,19 @@ public class DlCompletionTreeArc implements Serializable {
         reverse = null;
     }
 
+    /**
+     * set given arc as a reverse of current
+     * 
+     * @param v
+     *        v
+     */
+    public void setReverse(DlCompletionTreeArc v) {
+        reverse = v;
+        v.reverse = this;
+    }
+
     /** @return label of the edge */
+    @Nullable
     public Role getRole() {
         return role;
     }
@@ -120,6 +120,11 @@ public class DlCompletionTreeArc implements Serializable {
         return succEdge;
     }
 
+    /** @return true if isSuccEdge and not isBlocked and not isReflexiveEdge */
+    public boolean unblockable() {
+        return isSuccEdge() && !isIBlocked() && !isReflexiveEdge();
+    }
+
     /** @return true if the edge is the predecessor one */
     public boolean isPredEdge() {
         return !succEdge;
@@ -141,23 +146,20 @@ public class DlCompletionTreeArc implements Serializable {
      * @return check if arc is labelled by a super-role of PROLE
      */
     public boolean isNeighbour(Role pRole) {
-        return role != null && role.lesserequal(pRole);
+        return !isIBlocked() && role.lesserequal(pRole);
     }
 
     /**
      * @param pRole
      *        pRole
-     * @param dep
-     *        dep
      * @return same as above; fills DEP with current DEPSET if so
      */
-    public boolean isNeighbour(Role pRole, DepSet dep) {
+    @Nullable
+    public DepSet neighbourDepSet(Role pRole) {
         if (isNeighbour(pRole)) {
-            dep.clear();
-            dep.add(depSet);
-            return true;
+            return DepSet.create(depSet);
         }
-        return false;
+        return null;
     }
 
     /** @return is arc merged to another */
@@ -175,9 +177,10 @@ public class DlCompletionTreeArc implements Serializable {
      * 
      * @return restorer
      */
+    @Nullable
     public Restorer save() {
         if (role == null) {
-            throw new IllegalArgumentException();
+            return null;
         }
         Restorer ret = new EdgeRestorer(this);
         role = null;
@@ -192,9 +195,10 @@ public class DlCompletionTreeArc implements Serializable {
      *        dep
      * @return restorer
      */
+    @Nullable
     public Restorer addDep(DepSet dep) {
         if (dep.isEmpty()) {
-            throw new IllegalArgumentException();
+            return null;
         }
         Restorer ret = new EdgeDepRestorer(this);
         depSet.add(dep);
@@ -208,7 +212,6 @@ public class DlCompletionTreeArc implements Serializable {
      *        o
      */
     public void print(LogAdapter o) {
-        o.printTemplate(Templates.DLCOMPLETIONTREEARC, isIBlocked() ? "-"
-                : role.getName(), depSet);
+        o.printTemplate(Templates.DLCOMPLETIONTREEARC, isIBlocked() ? "-" : role.getIRI(), depSet);
     }
 }

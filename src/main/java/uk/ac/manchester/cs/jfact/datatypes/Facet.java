@@ -1,5 +1,7 @@
 package uk.ac.manchester.cs.jfact.datatypes;
 
+import org.semanticweb.owlapi.vocab.OWLFacet;
+
 /* This file is part of the JFact DL reasoner
  Copyright 2011-2013 by Ignazio Palmisano, Dmitry Tsarkov, University of Manchester
  This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
@@ -7,10 +9,8 @@ package uk.ac.manchester.cs.jfact.datatypes;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 /**
  * @author ignazio
- * @param <T>
- *        type
  */
-public interface Facet<T extends Comparable<T>> {
+public interface Facet {
 
     /**
      * This is a convenience method that enables each facet to parse its values
@@ -19,9 +19,11 @@ public interface Facet<T extends Comparable<T>> {
      * 
      * @param value
      *        value
+     * @param <T>
+     *        type
      * @return value that is assigned to this facet
      */
-    T parseNumber(Object value);
+    <T extends Comparable<T>> T parseNumber(Object value);
 
     /**
      * @param value
@@ -36,4 +38,7 @@ public interface Facet<T extends Comparable<T>> {
 
     /** @return the facet uri */
     String getURI();
+
+    /** @return OWLFacet vale */
+    OWLFacet facet();
 }

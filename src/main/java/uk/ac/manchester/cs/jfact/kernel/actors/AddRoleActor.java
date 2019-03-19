@@ -15,11 +15,10 @@ import conformance.PortedFrom;
 @PortedFrom(file = "tRole.cpp", name = "AddRoleActor")
 public class AddRoleActor extends ActorImpl {
 
-    private static final long serialVersionUID = 11000L;
+
     @PortedFrom(file = "tRole.cpp", name = "rset")
     private final List<Role> rset;
 
-    // TODO check other actors
     /**
      * @param v
      *        lit to accumulate primers

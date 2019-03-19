@@ -9,10 +9,12 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import org.semanticweb.owlapi.model.IRI;
 
-import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpression;
 import conformance.Original;
+import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpression;
 
 /**
  * @author ignazio
@@ -25,7 +27,9 @@ public interface Datatype<R extends Comparable<R>> extends DataExpression {
     /** @return true if this datatype is an expression */
     boolean isExpression();
 
-    /** @return this datatype as a datatype expression, if it is an expression. */
+    /**
+     * @return this datatype as a datatype expression, if it is an expression.
+     */
     DatatypeExpression<R> asExpression();
 
     /** @return the known ancestors of this datatype */
@@ -34,7 +38,9 @@ public interface Datatype<R extends Comparable<R>> extends DataExpression {
     /** @return true if this datatype value space is bounded */
     boolean getBounded();
 
-    /** @return the cardinality of the value space: finite or countably infinite */
+    /**
+     * @return the cardinality of the value space: finite or countably infinite
+     */
     cardinality getCardinality();
 
     /**
@@ -45,29 +51,30 @@ public interface Datatype<R extends Comparable<R>> extends DataExpression {
 
     /** @return the known values for a subset of the available facets */
     @SuppressWarnings("rawtypes")
-    Map<Facet, Comparable> getKnownNumericFacetValues();
+        Map<Facet, Comparable> getKnownNumericFacetValues();
 
     /** @return the known values for a subset of the available facets */
     @SuppressWarnings("rawtypes")
-    Map<Facet, Comparable> getKnownNonNumericFacetValues();
+        Map<Facet, Comparable> getKnownNonNumericFacetValues();
 
     /**
      * @param f
      *        facet
-     * @param <O>
-     *        facet type
      * @return known value for f, or null if there is no known value for the
      *         facet
      */
-    <O extends Comparable<O>> O getFacetValue(Facet<O> f);
+    @Nullable
+    @SuppressWarnings("rawtypes")
+        Comparable getFacetValue(Facet f);
 
     /**
      * @param f
      *        facet
      * @return numeric value
      */
+    @Nullable
     @SuppressWarnings("rawtypes")
-    Comparable getNumericFacetValue(Facet f);
+        Comparable getNumericFacetValue(Facet f);
 
     /** @return true if this datatype is numeric */
     boolean getNumeric();
@@ -142,8 +149,7 @@ public interface Datatype<R extends Comparable<R>> extends DataExpression {
     boolean isSubType(Datatype<?> type);
 
     /**
-     * @return the datatype uri as a string (there does seem to be no need for a
-     *         more complex representation)
+     * @return the datatype IRI
      */
     IRI getDatatypeIRI();
 
@@ -164,4 +170,37 @@ public interface Datatype<R extends Comparable<R>> extends DataExpression {
 
     /** @return cast as ordered datatype */
     OrderedDatatype<R> asOrderedDatatype();
+
+    /**
+     * @return a new numeric expression if this is a numeric datatype, otherwise
+     *         null
+     */
+    default DatatypeExpression<R> wrapAsNumericExpression() {
+        return isNumericDatatype() ? new DatatypeNumericExpressionImpl<>(this) : null;
+    }
+
+    /**
+     * @return a new ordered expression if this is ano ordered datatype,
+     *         otherwise null
+     */
+    default DatatypeExpression<R> wrapAsOrderedExpression() {
+        return isOrderedDatatype() ? new DatatypeOrderedExpressionImpl<>(this) : null;
+    }
+
+    /**
+     * @return a new datatype expression
+     */
+    default DatatypeExpression<R> wrapAsDatatypeExpression() {
+        return new DatatypeExpressionImpl<>(this);
+    }
+
+    /**
+     * @return host dataype
+     */
+    default Datatype<R> host() {
+        if (isExpression()) {
+            return asExpression().getHostType();
+        }
+        return this;
+    }
 }

@@ -10,18 +10,16 @@ import java.util.List;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.NAryExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.PortedFrom;
 
 /** concept union */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptOr")
-public class ConceptOr extends NAryExpressionImpl<ConceptExpression> implements
-        NAryExpression<ConceptExpression>, ConceptExpression, Serializable {
-
-    private static final long serialVersionUID = 11000L;
+public class ConceptOr extends NAryExpressionImpl<ConceptExpression>
+    implements NAryExpression<ConceptExpression>, ConceptExpression, Serializable {
 
     /**
      * create OR of expressions from the given array
@@ -46,7 +44,7 @@ public class ConceptOr extends NAryExpressionImpl<ConceptExpression> implements
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return IRI.create(toString());
     }
 }

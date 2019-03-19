@@ -5,6 +5,8 @@ package uk.ac.manchester.cs.jfact.helpers;
  This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
  This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
+import static java.util.stream.Collectors.joining;
+import static org.semanticweb.owlapi.util.OWLAPIStreamUtils.asList;
 import static uk.ac.manchester.cs.jfact.kernel.Token.*;
 
 import java.io.Serializable;
@@ -12,13 +14,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
+
+import javax.annotation.Nullable;
 
 import org.semanticweb.owlapi.reasoner.ReasonerInternalException;
 
-import uk.ac.manchester.cs.jfact.kernel.Lexeme;
-import uk.ac.manchester.cs.jfact.kernel.Token;
 import conformance.Original;
 import conformance.PortedFrom;
+import uk.ac.manchester.cs.jfact.kernel.Lexeme;
+import uk.ac.manchester.cs.jfact.kernel.Token;
 
 /**
  * DLTree class
@@ -28,7 +33,6 @@ import conformance.PortedFrom;
 @PortedFrom(file = "dltree.h", name = "TsTTree")
 public abstract class DLTree implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     private static final CloningVisitor cloner = new CloningVisitor();
     /** element in the tree node */
     protected Lexeme elem;
@@ -89,18 +93,10 @@ public abstract class DLTree implements Serializable {
     }
 
     /**
-     * @param r
-     *        ancestor
-     */
-    public void setAncestor(DLTree r) {
-        ancestor = r;
-    }
-
-    /**
      * @param d
      *        child to add
      */
-    public void addChild(DLTree d) {
+    public void addChild(@Nullable DLTree d) {
         if (d != null) {
             children.add(d);
             d.ancestor = this;
@@ -111,7 +107,7 @@ public abstract class DLTree implements Serializable {
      * @param d
      *        child to add in first position
      */
-    public void addFirstChild(DLTree d) {
+    public void addFirstChild(@Nullable DLTree d) {
         if (d != null) {
             children.add(0, d);
             d.ancestor = this;
@@ -122,17 +118,15 @@ public abstract class DLTree implements Serializable {
      * @param d
      *        children to add in first position
      */
-    public void addFirstChildren(Collection<DLTree> d) {
+    public void addFirstChildren(@Nullable Collection<DLTree> d) {
         if (d != null) {
             children.addAll(0, d);
-            for (DLTree t : d) {
-                t.ancestor = this;
-            }
+            d.forEach(t -> t.ancestor = this);
         }
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (obj == null) {
             return false;
         }
@@ -148,19 +142,10 @@ public abstract class DLTree implements Serializable {
 
     @Override
     public String toString() {
-        if (getChildren().size() > 0) {
-            StringBuilder b = new StringBuilder();
-            b.append('(');
-            b.append(elem);
-            for (DLTree d : getChildren()) {
-                b.append(' ');
-                b.append(d);
-            }
-            b.append(')');
-            return b.toString();
-        } else {
-            return elem.toString();
+        if (!getChildren().isEmpty()) {
+            return "(" + elem + " " + children().map(Object::toString).collect(joining(" ")) + ")";
         }
+        return elem.toString();
     }
 
     @Override
@@ -189,11 +174,18 @@ public abstract class DLTree implements Serializable {
      * @param replacement
      *        replacement
      */
-    public abstract void replace(DLTree toReplace, DLTree replacement);
+    public abstract void replace(DLTree toReplace, @Nullable DLTree replacement);
 
     /** @return list of children */
     public List<DLTree> getChildren() {
         return children;
+    }
+
+    /**
+     * @return children stream
+     */
+    public Stream<DLTree> children() {
+        return getChildren().stream();
     }
 
     /**
@@ -203,7 +195,7 @@ public abstract class DLTree implements Serializable {
      *        t2
      * @return true if arguments are equal
      */
-    public static boolean equalTrees(DLTree t1, DLTree t2) {
+    public static boolean equalTrees(@Nullable DLTree t1, @Nullable DLTree t2) {
         if (t1 == null && t2 == null) {
             return true;
         }
@@ -219,8 +211,7 @@ public abstract class DLTree implements Serializable {
             }
             Collection<DLTree> c1 = t1.getChildren();
             Collection<DLTree> c2 = t2.getChildren();
-            return c1.size() == c2.size() && c1.containsAll(c2)
-                    && c2.containsAll(c1);
+            return c1.size() == c2.size() && c1.containsAll(c2) && c2.containsAll(c1);
         }
         return false;
     }
@@ -248,9 +239,15 @@ public abstract class DLTree implements Serializable {
     // check if DL tree is a concept/individual name
     /** @return true if token is a cname or iname */
     public boolean isName() {
-        return token() == CNAME || token() == INAME;
+        return isCName() || token() == INAME;
+    }
+
+    /** @return true if token is a cname or iname */
+    public boolean isCName() {
+        return token() == CNAME;
     }
 }
+
 
 @Original
 interface DLTreeVisitor {
@@ -264,6 +261,7 @@ interface DLTreeVisitor {
     void visit(NDLTree t);
 }
 
+
 @Original
 interface DLTreeVisitorEx<O> {
 
@@ -276,10 +274,9 @@ interface DLTreeVisitorEx<O> {
     O visit(NDLTree t);
 }
 
+
 @Original
 class CloningVisitor implements DLTreeVisitorEx<DLTree>, Serializable {
-
-    private static final long serialVersionUID = 11000L;
 
     @Override
     public DLTree visit(LEAFDLTree t) {
@@ -293,24 +290,18 @@ class CloningVisitor implements DLTreeVisitorEx<DLTree>, Serializable {
 
     @Override
     public DLTree visit(TWODLTree t) {
-        return new TWODLTree(new Lexeme(t.elem), t.getLeft().accept(this), t
-                .getRight().accept(this));
+        return new TWODLTree(new Lexeme(t.elem), t.getLeft().accept(this), t.getRight().accept(this));
     }
 
     @Override
     public DLTree visit(NDLTree t) {
-        List<DLTree> l = new ArrayList<DLTree>();
-        for (DLTree tree : t.children) {
-            l.add(tree.accept(this));
-        }
-        return new NDLTree(new Lexeme(t.elem), l);
+        return new NDLTree(new Lexeme(t.elem), asList(t.children().map(tree -> tree.accept(this))));
     }
 }
 
+
 @Original
 class ReverseCloningVisitor implements DLTreeVisitorEx<DLTree>, Serializable {
-
-    private static final long serialVersionUID = 11000L;
 
     @Override
     public DLTree visit(LEAFDLTree t) {
@@ -324,27 +315,21 @@ class ReverseCloningVisitor implements DLTreeVisitorEx<DLTree>, Serializable {
 
     @Override
     public DLTree visit(TWODLTree t) {
-        return new TWODLTree(new Lexeme(t.elem), t.getRight().accept(this), t
-                .getLeft().accept(this));
+        return new TWODLTree(new Lexeme(t.elem), t.getRight().accept(this), t.getLeft().accept(this));
     }
 
     @Override
     public DLTree visit(NDLTree t) {
-        List<DLTree> l = new ArrayList<DLTree>(t.children);
-        List<DLTree> actual = new ArrayList<DLTree>();
-        Collections.reverse(l);
-        for (DLTree tree : l) {
-            actual.add(tree.accept(this));
-        }
+        List<DLTree> actual = new ArrayList<>();
+        t.children.forEach(tree -> actual.add(0, tree.accept(this)));
         return new NDLTree(new Lexeme(t.elem), actual);
     }
 }
 
+
 /** things that have no children */
 @Original
 class LEAFDLTree extends DLTree {
-
-    private static final long serialVersionUID = 11000L;
 
     LEAFDLTree(Lexeme l) {
         super(l);
@@ -381,19 +366,19 @@ class LEAFDLTree extends DLTree {
     }
 
     @Override
-    public void replace(DLTree toReplace, DLTree replacement) {
+    public void replace(DLTree toReplace, @Nullable DLTree replacement) {
         throw new UnsupportedOperationException();
     }
 }
+
 
 /** covers trees with only one child, i.e., inverse, not */
 @Original
 class ONEDLTree extends DLTree {
 
-    private static final long serialVersionUID = 11000L;
     private DLTree child;
 
-    ONEDLTree(Lexeme l, DLTree t) {
+    ONEDLTree(Lexeme l, @Nullable DLTree t) {
         super(l);
         child = t;
         if (t != null) {
@@ -432,7 +417,7 @@ class ONEDLTree extends DLTree {
     }
 
     @Override
-    public void replace(DLTree toReplace, DLTree replacement) {
+    public void replace(DLTree toReplace, @Nullable DLTree replacement) {
         if (child.equals(toReplace)) {
             child = replacement;
             if (replacement != null) {
@@ -442,15 +427,14 @@ class ONEDLTree extends DLTree {
     }
 }
 
+
 /** covers trees with two and only two children */
 @Original
 class TWODLTree extends DLTree {
 
-    private static final long serialVersionUID = 11000L;
-
     TWODLTree(Lexeme l, DLTree t1, DLTree t2) {
         super(l);
-        children = new ArrayList<DLTree>(2);
+        children = new ArrayList<>(2);
         addChild(t1);
         addChild(t2);
     }
@@ -481,7 +465,7 @@ class TWODLTree extends DLTree {
     }
 
     @Override
-    public void replace(DLTree toReplace, DLTree replacement) {
+    public void replace(DLTree toReplace, @Nullable DLTree replacement) {
         int p = children.indexOf(toReplace);
         if (p > -1) {
             children.set(p, replacement);
@@ -492,32 +476,29 @@ class TWODLTree extends DLTree {
     }
 }
 
+
 @Original
 class NDLTree extends DLTree {
 
-    private static final long serialVersionUID = 11000L;
-
     public NDLTree(Lexeme l, Collection<DLTree> trees) {
         super(l);
-        children = new ArrayList<DLTree>();
         if (trees.size() < 2) {
             throw new ReasonerInternalException(
-                    "not enough elements in the n-ary element");
+                "not enough elements in the n-ary element: " + trees);
         }
-        for (DLTree d : trees) {
-            addChild(d);
-        }
+        children = new ArrayList<>();
+        trees.forEach(this::addChild);
     }
 
-    public NDLTree(Lexeme l, DLTree C, DLTree D) {
+    public NDLTree(Lexeme l, @Nullable DLTree c, @Nullable DLTree d) {
         super(l);
-        children = new ArrayList<DLTree>();
-        if (C == null || D == null) {
+        if (c == null || d == null) {
             throw new ReasonerInternalException(
-                    "not enough elements in the n-ary element");
+                "not enough elements in the n-ary element: " + c + " " + d);
         }
-        addChild(C);
-        addChild(D);
+        children = new ArrayList<>();
+        addChild(c);
+        addChild(d);
     }
 
     @Override
@@ -546,7 +527,7 @@ class NDLTree extends DLTree {
     }
 
     @Override
-    public void replace(DLTree toReplace, DLTree replacement) {
+    public void replace(DLTree toReplace, @Nullable DLTree replacement) {
         if (children.contains(toReplace)) {
             children.remove(toReplace);
             if (replacement != null) {

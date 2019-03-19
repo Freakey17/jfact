@@ -7,6 +7,9 @@ package uk.ac.manchester.cs.jfact.datatypes;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.io.Serializable;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.semanticweb.owlapi.model.IRI;
 
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
@@ -14,9 +17,8 @@ import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
 
 class LiteralImpl<T extends Comparable<T>> implements Literal<T>, Serializable {
 
-    private static final long serialVersionUID = 11000L;
-    private final Datatype<T> type;
-    private final String value;
+    @Nonnull private final Datatype<T> type;
+    @Nonnull private final String value;
 
     public LiteralImpl(Datatype<T> type, String value) {
         this.type = type;
@@ -49,35 +51,44 @@ class LiteralImpl<T extends Comparable<T>> implements Literal<T>, Serializable {
     }
 
     @Override
-    public int compareTo(Literal<T> arg0) {
+    public int compareTo(@Nullable Literal<T> arg0) {
         return this.type.parseValue(this.value).compareTo(arg0.typedValue());
     }
 
+    @Nonnull
     @Override
     public String toString() {
         return '"' + this.value + "\"^^" + this.type;
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return IRI.create(toString());
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (super.equals(obj)) {
             return true;
         }
         if (obj instanceof Literal) {
-            return this.type.equals(((Literal<?>) obj).getDatatypeExpression())
-                    && this.typedValue()
-                            .equals(((Literal<?>) obj).typedValue());
+            Literal<?> other = (Literal<?>) obj;
+            if (type.equals(DatatypeFactory.PLAINLITERAL) || type.equals(DatatypeFactory.STRING)) {
+                if (other.getDatatypeExpression().equals(DatatypeFactory.PLAINLITERAL)
+                    || other.getDatatypeExpression().equals(DatatypeFactory.STRING)) {
+                    return this.value.replace("@", "").equals(other.value().replace("@", ""));
+                }
+            }
+            return this.type.equals(other.getDatatypeExpression()) && this.typedValue().equals(other.typedValue());
         }
         return false;
     }
 
     @Override
     public int hashCode() {
+        if (type.equals(DatatypeFactory.PLAINLITERAL) || type.equals(DatatypeFactory.STRING)) {
+            return DatatypeFactory.PLAINLITERAL.hashCode() + this.value.replace("@", "").hashCode();
+        }
         return this.type.hashCode() + this.typedValue().hashCode();
     }
 }

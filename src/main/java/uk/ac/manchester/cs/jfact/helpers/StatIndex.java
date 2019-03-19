@@ -7,16 +7,13 @@ package uk.ac.manchester.cs.jfact.helpers;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 /** stat index enum */
 public enum StatIndex {
-    /** Depth */
-    Depth,
-    /** Size */
-    Size,
-    /** Branch */
-    Branch,
-    /** Gener */
-    Gener,
-    /** Freq */
-    Freq;
+    //@formatter:off
+    /** Depth */    DEPTH, 
+    /** Size */     SIZE, 
+    /** Branch */   BRANCH, 
+    /** Gener */    GENER, 
+    /** Freq */     FREQ;
+    //@formatter:on
 
     /**
      * @param pos
@@ -35,15 +32,15 @@ public enum StatIndex {
     public static int choose(char c) {
         switch (c) {
             case 'S':
-                return Size.getIndex(false);
+                return SIZE.getIndex(false);
             case 'D':
-                return Depth.getIndex(false);
+                return DEPTH.getIndex(false);
             case 'B':
-                return Branch.getIndex(false);
+                return BRANCH.getIndex(false);
             case 'G':
-                return Gener.getIndex(false);
+                return GENER.getIndex(false);
             default:
-                return Freq.getIndex(false);
+                return FREQ.getIndex(false);
         }
     }
 
@@ -62,14 +59,15 @@ public enum StatIndex {
      *        pos
      * @param stat
      *        stat
+     * @param debug
+     *        true if debug values
      */
-    public static void updateStatValues(int d, int s, int b, int g,
-            boolean pos, int[] stat) {
-        stat[Size.getIndex(pos)] += s;
-        stat[Branch.getIndex(pos)] += b;
-        stat[Gener.getIndex(pos)] += g;
-        if (d > stat[Depth.getIndex(pos)]) {
-            stat[Depth.getIndex(pos)] = d;
+    public static void updateStatValues(int d, int s, int b, int g, boolean pos, int[] stat, boolean debug) {
+        stat[SIZE.getIndex(pos)] += s;
+        stat[BRANCH.getIndex(pos)] += b;
+        stat[GENER.getIndex(pos)] += g;
+        if (d > stat[DEPTH.getIndex(pos)]) {
+            stat[DEPTH.getIndex(pos)] = d;
         }
     }
 
@@ -84,11 +82,12 @@ public enum StatIndex {
      *        pos
      * @param stat
      *        stat
+     * @param debug
+     *        true if debug values
      */
-    public static void updateStatValues(DLVertex v, boolean posV, boolean pos,
-            int[] stat) {
-        updateStatValues(getDepth(posV, v.stat), getSize(posV, v.stat),
-                getBranch(posV, v.stat), getGener(posV, v.stat), pos, stat);
+    public static void updateStatValues(DLVertex v, boolean posV, boolean pos, int[] stat, boolean debug) {
+        updateStatValues(getDepth(posV, v.stat), getSize(posV, v.stat), getBranch(posV, v.stat), getGener(posV, v.stat),
+            pos, stat, debug);
     }
 
     /**
@@ -100,7 +99,7 @@ public enum StatIndex {
      *        stat
      */
     public static void incFreqValue(boolean pos, int[] stat) {
-        stat[Freq.getIndex(pos)] += 1;
+        stat[FREQ.getIndex(pos)] += 1;
     }
 
     /**
@@ -113,7 +112,7 @@ public enum StatIndex {
      * @return depth
      */
     public static int getDepth(boolean pos, int[] stat) {
-        return stat[Depth.getIndex(pos)];
+        return stat[DEPTH.getIndex(pos)];
     }
 
     /**
@@ -126,7 +125,7 @@ public enum StatIndex {
      * @return size
      */
     protected static int getSize(boolean pos, int[] stat) {
-        return stat[Size.getIndex(pos)];
+        return stat[SIZE.getIndex(pos)];
     }
 
     /**
@@ -139,7 +138,7 @@ public enum StatIndex {
      * @return branch
      */
     protected static int getBranch(boolean pos, int[] stat) {
-        return stat[Branch.getIndex(pos)];
+        return stat[BRANCH.getIndex(pos)];
     }
 
     /**
@@ -152,7 +151,7 @@ public enum StatIndex {
      * @return gener
      */
     protected static int getGener(boolean pos, int[] stat) {
-        return stat[Gener.getIndex(pos)];
+        return stat[GENER.getIndex(pos)];
     }
 
     /**
@@ -165,6 +164,6 @@ public enum StatIndex {
      * @return freq
      */
     protected static int getFreq(boolean pos, int[] stat) {
-        return stat[Freq.getIndex(pos)];
+        return stat[FREQ.getIndex(pos)];
     }
 }

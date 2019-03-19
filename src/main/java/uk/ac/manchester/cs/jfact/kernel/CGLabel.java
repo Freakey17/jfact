@@ -8,103 +8,109 @@ package uk.ac.manchester.cs.jfact.kernel;
 import static uk.ac.manchester.cs.jfact.helpers.Helper.*;
 
 import java.io.Serializable;
-import java.util.Collections;
-import java.util.IdentityHashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
-import uk.ac.manchester.cs.jfact.helpers.ArrayIntMap;
-import uk.ac.manchester.cs.jfact.kernel.state.SaveState;
+import javax.annotation.Nullable;
+
 import conformance.Original;
 import conformance.PortedFrom;
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
+import uk.ac.manchester.cs.jfact.helpers.ArrayIntMap;
+import uk.ac.manchester.cs.jfact.kernel.options.JFactReasonerConfiguration;
+import uk.ac.manchester.cs.jfact.kernel.state.SaveState;
 
 /** Completion graph label */
 @PortedFrom(file = "CGLabel.h", name = "CGLabel")
 public class CGLabel implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
-    @Original
-    private static int idcounter = 0;
+    @Original private static int idcounter = 0;
+    /** all simple concepts, labelled a node */
+    @PortedFrom(file = "CGLabel.h", name = "scLabel") private final CWDArray scLabel;
+    /** all complex concepts (ie, FORALL, GE), labelled a node */
+    @PortedFrom(file = "CGLabel.h", name = "ccLabel") private final CWDArray ccLabel;
+    @Original private final int id;
+    @Original private TIntSet lesserIndex = new TIntHashSet();
+    @Original private final List<CGLabel> lesserEqualsList = new ArrayList<>();
+
+    /**
+     * Default constructor.
+     * 
+     * @param config
+     *        config object
+     */
+    public CGLabel(JFactReasonerConfiguration config) {
+        // init label with reasonable size
+        // XXX size might need tuning
+        scLabel = new CWDArray(config, 8);
+        ccLabel = new CWDArray(config, 4);
+        id = getnewId();
+    }
 
     @Original
     private static int getnewId() {
         return idcounter++;
     }
 
-    /** all simple concepts, labelled a node */
-    @PortedFrom(file = "CGLabel.h", name = "scLabel")
-    private final CWDArray scLabel;
-    /** all complex concepts (ie, FORALL, GE), labelled a node */
-    @PortedFrom(file = "CGLabel.h", name = "ccLabel")
-    private final CWDArray ccLabel;
-    @Original
-    private final int id;
-
-    /** default constructor */
-    public CGLabel() {
-        scLabel = new CWDArray();
-        ccLabel = new CWDArray();
-        id = getnewId();
-    }
-
     /** @return simple concepts list */
     @Original
-    public List<ConceptWDep> get_sc() {
+    public List<ConceptWDep> getSimpleConcepts() {
         return scLabel.getBase();
     }
 
     /** @return complext concepts list */
     @Original
-    public List<ConceptWDep> get_cc() {
+    public List<ConceptWDep> getComplexConcepts() {
         return ccLabel.getBase();
     }
 
     /** @return simple concepts map */
     @Original
-    public ArrayIntMap get_sc_concepts() {
+    public ArrayIntMap getSimpleConceptsMap() {
         return scLabel.getContainedConcepts();
     }
 
     /** @return complex concepts map */
     @Original
-    public ArrayIntMap get_cc_concepts() {
+    public ArrayIntMap getComplexConceptsMap() {
         return ccLabel.getContainedConcepts();
     }
 
     /**
-     * @param tag
-     *        tag
+     * @param complex
+     *        true if complex concepts sought
      * @return label associated with the concepts defined by TAG
      */
     @PortedFrom(file = "CGLabel.h", name = "getLabel")
-    public CWDArray getLabel(DagTag tag) {
-        return tag.isComplexConcept() ? ccLabel : scLabel;
+    public CWDArray getLabel(boolean complex) {
+        return complex ? ccLabel : scLabel;
     }
 
     /**
      * index p by tag, clear caches
      * 
-     * @param tag
-     *        tag
+     * @param complex
+     *        true if complex concepts sought
      * @param p
      *        p
      */
     @Original
-    public void add(DagTag tag, ConceptWDep p) {
-        getLabel(tag).private_add(p);
+    public void add(boolean complex, ConceptWDep p) {
+        getLabel(complex).privateAdd(p);
         clearMyCache();
     }
 
     @Original
     protected void clearMyCache() {
-        lesserEquals.clear();
+        lesserEqualsList.clear();
+        lesserIndex.clear();
     }
 
     @Original
     protected void clearOthersCache() {
-        for (CGLabel c : lesserEquals) {
-            c.lesserEquals.remove(this);
-        }
+        lesserEqualsList.forEach(c -> c.lesserEqualsList.remove(this));
+        lesserEqualsList.forEach(c -> c.lesserIndex.remove(id));
     }
 
     /**
@@ -122,10 +128,6 @@ public class CGLabel implements Serializable {
         return id;
     }
 
-    @Original
-    private final Set<CGLabel> lesserEquals = Collections
-            .newSetFromMap(new IdentityHashMap<CGLabel, Boolean>());
-
     /**
      * @param label
      *        label
@@ -136,19 +138,19 @@ public class CGLabel implements Serializable {
         if (this == label) {
             return true;
         }
-        if (lesserEquals.contains(label)) {
+        if (lesserIndex.contains(label.id)) {
             return true;
         }
-        boolean toReturn = scLabel.lesserequal(label.scLabel)
-                && ccLabel.lesserequal(label.ccLabel);
+        boolean toReturn = scLabel.lesserequal(label.scLabel) && ccLabel.lesserequal(label.ccLabel);
         if (toReturn) {
-            lesserEquals.add(label);
+            lesserEqualsList.add(label);
+            lesserIndex.add(label.id);
         }
         return toReturn;
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (obj == null) {
             return false;
         }
@@ -157,9 +159,7 @@ public class CGLabel implements Serializable {
         }
         if (obj instanceof CGLabel) {
             CGLabel obj2 = (CGLabel) obj;
-            boolean toReturn = scLabel.equals(obj2.scLabel)
-                    && ccLabel.equals(obj2.ccLabel);
-            return toReturn;
+            return scLabel.equals(obj2.scLabel) && ccLabel.equals(obj2.ccLabel);
         }
         return false;
     }
@@ -214,10 +214,10 @@ public class CGLabel implements Serializable {
     @PortedFrom(file = "CGLabel.h", name = "contains")
     public boolean contains(int p) {
         assert isCorrect(p);
-        if (p == bpTOP) {
+        if (p == BP_TOP) {
             return true;
         }
-        if (p == bpBOTTOM) {
+        if (p == BP_BOTTOM) {
             return false;
         }
         return scLabel.contains(p) || ccLabel.contains(p);
@@ -230,11 +230,32 @@ public class CGLabel implements Serializable {
      */
     @PortedFrom(file = "CGLabel.h", name = "getConcept")
     public ConceptWDep getConceptWithBP(int bp) {
-        ConceptWDep toReturn = scLabel.getConceptWithBP(bp);
+        ConceptWDep toReturn = getSCConceptWithBP(bp);
         if (toReturn != null) {
             return toReturn;
         }
-        toReturn = ccLabel.getConceptWithBP(bp);
-        return toReturn;
+        return getCCConceptWithBP(bp);
+    }
+
+    /**
+     * @param bp
+     *        bp
+     * @return concept with index bp
+     */
+    @Nullable
+    @PortedFrom(file = "CGLabel.h", name = "getConcept")
+    public ConceptWDep getSCConceptWithBP(int bp) {
+        return scLabel.getConceptWithBP(bp);
+    }
+
+    /**
+     * @param bp
+     *        bp
+     * @return concept with index bp
+     */
+    @Nullable
+    @PortedFrom(file = "CGLabel.h", name = "getConcept")
+    public ConceptWDep getCCConceptWithBP(int bp) {
+        return ccLabel.getConceptWithBP(bp);
     }
 }

@@ -10,19 +10,17 @@ import java.util.List;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.datatypes.Literal;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.NAryExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.PortedFrom;
 
 /** data one of */
 @PortedFrom(file = "tDLExpression.h", name = "TDLDataOneOf")
-public class DataOneOf extends NAryExpressionImpl<Literal<?>> implements
-        NAryExpression<Literal<?>>, DataExpression, Serializable {
-
-    private static final long serialVersionUID = 11000L;
+public class DataOneOf extends NAryExpressionImpl<Literal<?>>
+    implements NAryExpression<Literal<?>>, DataExpression, Serializable {
 
     /**
      * create one-of from individuals in the given array
@@ -47,7 +45,7 @@ public class DataOneOf extends NAryExpressionImpl<Literal<?>> implements
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return IRI.create(toString());
     }
 }

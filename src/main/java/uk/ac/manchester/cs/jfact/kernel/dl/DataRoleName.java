@@ -7,26 +7,23 @@ package uk.ac.manchester.cs.jfact.kernel.dl;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.io.Serializable;
 
-import org.semanticweb.owlapi.model.IRI;
+import org.semanticweb.owlapi.model.OWLEntity;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataRoleExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.NamedEntity;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.PortedFrom;
 
 /** data role name */
 @PortedFrom(file = "tDLExpression.h", name = "TDLDataRoleName")
-public class DataRoleName extends NamedEntityImpl implements
-        DataRoleExpression, NamedEntity, Serializable {
-
-    private static final long serialVersionUID = 11000L;
+public class DataRoleName extends NamedEntityImpl implements DataRoleExpression, NamedEntity, Serializable {
 
     /**
      * @param name
      *        name
      */
-    public DataRoleName(IRI name) {
+    public DataRoleName(OWLEntity name) {
         super(name);
     }
 

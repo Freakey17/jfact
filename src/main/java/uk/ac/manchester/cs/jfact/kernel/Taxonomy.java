@@ -1,48 +1,49 @@
 package uk.ac.manchester.cs.jfact.kernel;
 
-/* This file is part of the JFact DL reasoner
- Copyright 2011-2013 by Ignazio Palmisano, Dmitry Tsarkov, University of Manchester
- This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
- This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Set;
-import java.util.TreeSet;
+import static org.semanticweb.owlapi.util.OWLAPIStreamUtils.asList;
 
+import java.io.Serializable;
+import java.util.*;
+import java.util.stream.Stream;
+
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.actors.Actor;
 import uk.ac.manchester.cs.jfact.kernel.actors.SupConceptActor;
 import uk.ac.manchester.cs.jfact.kernel.options.JFactReasonerConfiguration;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** taxonomy */
 @PortedFrom(file = "Taxonomy.h", name = "Taxonomy")
 public class Taxonomy implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** array of taxonomy verteces */
-    @PortedFrom(file = "Taxonomy.h", name = "Graph")
-    private final List<TaxonomyVertex> graph = new ArrayList<TaxonomyVertex>();
+    @PortedFrom(file = "Taxonomy.h", name = "Graph") private final List<TaxonomyVertex> graph = new ArrayList<>();
     /** aux. vertex to be included to taxonomy */
-    @PortedFrom(file = "Taxonomy.h", name = "Current")
-    protected TaxonomyVertex current = new TaxonomyVertex();
+    @PortedFrom(file = "Taxonomy.h", name = "Current") protected TaxonomyVertex current = new TaxonomyVertex();
     /** behaviour flag: if true, insert temporary vertex into taxonomy */
-    @PortedFrom(file = "Taxonomy.h", name = "willInsertIntoTaxonomy")
-    protected boolean willInsertIntoTaxonomy = true;
+    @PortedFrom(file = "Taxonomy.h", name = "willInsertIntoTaxonomy") protected boolean willInsertIntoTaxonomy = true;
     /** vertex with parent Top and child Bot, represents the fresh entity */
-    @PortedFrom(file = "Taxonomy.h", name = "FreshNode")
-    protected final TaxonomyVertex FreshNode = new TaxonomyVertex();
+    @PortedFrom(file = "Taxonomy.h", name = "FreshNode") protected final TaxonomyVertex freshNode = new TaxonomyVertex();
     /** labeller for marking nodes as checked */
-    @PortedFrom(file = "Taxonomy.h", name = "checkLabel")
-    protected long visitedLabel = 1;
-    @Original
-    private final JFactReasonerConfiguration options;
+    @PortedFrom(file = "Taxonomy.h", name = "checkLabel") protected long visitedLabel = 1;
+    @Original private final JFactReasonerConfiguration options;
+
+    /**
+     * @param pTop
+     *        pTop
+     * @param pBottom
+     *        pBottom
+     * @param c
+     *        c
+     */
+    public Taxonomy(ClassifiableEntry pTop, ClassifiableEntry pBottom, JFactReasonerConfiguration c) {
+        options = c;
+        graph.add(new TaxonomyVertex(pBottom));
+        graph.add(new TaxonomyVertex(pTop));
+        // set up fresh node
+        freshNode.addNeighbour(true, getTopVertex());
+        freshNode.addNeighbour(false, getBottomVertex());
+    }
 
     /** @return current */
     @PortedFrom(file = "Taxonomy.h", name = "getCurrent")
@@ -79,8 +80,9 @@ public class Taxonomy implements Serializable {
      * @return false if actor does not apply
      */
     @PortedFrom(file = "Taxonomy.h", name = "getRelativesInfo")
-    public boolean getRelativesInfo(TaxonomyVertex node, SupConceptActor actor,
-            boolean needCurrent, boolean onlyDirect, boolean upDirection) {
+    public boolean getRelativesInfo(TaxonomyVertex node, SupConceptActor actor, boolean needCurrent, boolean onlyDirect,
+        boolean upDirection) {
+        // XXX complexity here
         // if current node processed OK and there is no need to continue -- exit
         // this is the helper to the case like getDomain():
         // if there is a named concept that represent's a domain -- that's what
@@ -94,11 +96,10 @@ public class Taxonomy implements Serializable {
                     return true;
                 }
             }
-            Queue<Iterable<TaxonomyVertex>> queue = new LinkedList<Iterable<TaxonomyVertex>>();
+            Queue<Stream<TaxonomyVertex>> queue = new LinkedList<>();
             queue.add(node.neigh(upDirection));
-            while (queue.size() > 0) {
-                Iterable<TaxonomyVertex> neigh = queue.remove();
-                for (TaxonomyVertex _node : neigh) {
+            while (!queue.isEmpty()) {
+                for (TaxonomyVertex _node : asList(queue.remove())) {
                     // recursive applicability checking
                     if (!isVisited(_node)) {
                         // label node as visited
@@ -140,8 +141,9 @@ public class Taxonomy implements Serializable {
      *        upDirection
      */
     @PortedFrom(file = "Taxonomy.h", name = "getRelativesInfo")
-    public void getRelativesInfo(TaxonomyVertex node, Actor actor,
-            boolean needCurrent, boolean onlyDirect, boolean upDirection) {
+    public void getRelativesInfo(TaxonomyVertex node, Actor actor, boolean needCurrent, boolean onlyDirect,
+        boolean upDirection) {
+        // XXX complexity here
         // if current node processed OK and there is no need to continue -- exit
         // this is the helper to the case like getDomain():
         // if there is a named concept that represent's a domain -- that's what
@@ -149,36 +151,28 @@ public class Taxonomy implements Serializable {
         if (needCurrent && actor.apply(node) && onlyDirect) {
             return;
         }
-        List<TaxonomyVertex> queue = new LinkedList<TaxonomyVertex>();
-        for (TaxonomyVertex v : node.neigh(upDirection)) {
-            queue.add(v);
-        }
-        Set<TaxonomyVertex> pastBoundary = new HashSet<TaxonomyVertex>();
-        while (queue.size() > 0) {
-            TaxonomyVertex _node = queue.remove(0);
+        List<TaxonomyVertex> queue = new LinkedList<>();
+        node.neigh(upDirection).forEach(queue::add);
+        Set<TaxonomyVertex> pastBoundary = new HashSet<>();
+        while (!queue.isEmpty()) {
+            TaxonomyVertex nextNode = queue.remove(0);
             // recursive applicability checking
-            if (!isVisited(_node)) {
+            if (!isVisited(nextNode)) {
                 // label node as visited
-                setVisited(_node);
+                setVisited(nextNode);
                 // if current node processed OK and there is no need to
                 // continue -- exit
                 // if node is NOT processed for some reasons -- go to
                 // another level
-                boolean applied = actor.apply(_node);
+                boolean applied = actor.apply(nextNode);
                 if (applied && onlyDirect) {
-                    for (TaxonomyVertex boundary : _node.neigh(upDirection)) {
-                        setAllVisited(boundary, upDirection, pastBoundary);
-                    }
+                    nextNode.neigh(upDirection).forEach(boundary -> setAllVisited(boundary, upDirection, pastBoundary));
                     continue;
                 }
                 // apply method to the proper neighbours with proper
                 // parameters
                 // only pick nodes that are policy applicable
-                for (TaxonomyVertex v : _node.neigh(upDirection)) {
-                    if (actor.applicable(v) || !onlyDirect) {
-                        queue.add(v);
-                    }
-                }
+                nextNode.neigh(upDirection).filter(v -> actor.applicable(v) || !onlyDirect).forEach(queue::add);
             }
         }
         actor.removePastBoundaries(pastBoundary);
@@ -196,14 +190,21 @@ public class Taxonomy implements Serializable {
         node.setChecked(visitedLabel);
     }
 
-    public void setAllVisited(TaxonomyVertex node, boolean direction,
-            Set<TaxonomyVertex> pastBoundary) {
+    /**
+     * @param node
+     *        node to visit
+     * @param direction
+     *        up or down
+     * @param pastBoundary
+     *        set of vertexes past the boundary
+     */
+    public void setAllVisited(TaxonomyVertex node, boolean direction, Set<TaxonomyVertex> pastBoundary) {
         pastBoundary.add(node);
         setVisited(node);
-        for (TaxonomyVertex v : node.neigh(direction)) {
+        node.neigh(direction).forEach(v -> {
             setVisited(v);
             setAllVisited(v, direction, pastBoundary);
-        }
+        });
     }
 
     /**
@@ -220,24 +221,6 @@ public class Taxonomy implements Serializable {
     @PortedFrom(file = "Taxonomy.h", name = "clearCheckedLabel")
     protected void clearVisited() {
         visitedLabel++;
-    }
-
-    /**
-     * @param pTop
-     *        pTop
-     * @param pBottom
-     *        pBottom
-     * @param c
-     *        c
-     */
-    public Taxonomy(ClassifiableEntry pTop, ClassifiableEntry pBottom,
-            JFactReasonerConfiguration c) {
-        options = c;
-        graph.add(new TaxonomyVertex(pBottom));
-        graph.add(new TaxonomyVertex(pTop));
-        // set up fresh node
-        FreshNode.addNeighbour(true, getTopVertex());
-        FreshNode.addNeighbour(false, getBottomVertex());
     }
 
     /** @return reasoner configuration */
@@ -264,27 +247,16 @@ public class Taxonomy implements Serializable {
      */
     @PortedFrom(file = "Taxonomy.h", name = "getFreshVertex")
     public TaxonomyVertex getFreshVertex(ClassifiableEntry e) {
-        FreshNode.setSample(e, false);
-        return FreshNode;
+        freshNode.setSample(e, false);
+        return freshNode;
     }
 
     @Override
     public String toString() {
         StringBuilder o = new StringBuilder();
         o.append("All entries are in format:\n\"entry\" {n: parent_1 ... parent_n} {m: child_1 child_m}\n\n");
-        TreeSet<TaxonomyVertex> sorted = new TreeSet<TaxonomyVertex>(
-                new Comparator<TaxonomyVertex>() {
-
-                    @Override
-                    public int compare(TaxonomyVertex o1, TaxonomyVertex o2) {
-                        return o1.getPrimer().getName()
-                                .compareTo(o2.getPrimer().getName());
-                    }
-                });
-        sorted.addAll(graph.subList(1, graph.size()));
-        for (TaxonomyVertex p : sorted) {
-            o.append(p);
-        }
+        graph.stream().skip(1).sorted((o1, o2) -> o1.getPrimer().getIRI().compareTo(o2.getPrimer().getIRI())).forEach(
+            o::append);
         o.append(getBottomVertex());
         return o.toString();
     }
@@ -297,7 +269,7 @@ public class Taxonomy implements Serializable {
      */
     @PortedFrom(file = "Taxonomy.h", name = "removeNode")
     public void removeNode(TaxonomyVertex node) {
-        graph.remove(node);
+        node.setInUse(false);
     }
 
     /**
@@ -314,15 +286,12 @@ public class Taxonomy implements Serializable {
     @PortedFrom(file = "Taxonomy.h", name = "finalise")
     public void finalise() {
         // create links from leaf concepts to bottom
-        boolean upDirection = false;
-        // TODO maybe useful to index Graph
-        for (int i = 1; i < graph.size(); i++) {
-            TaxonomyVertex p = graph.get(i);
-            if (p.noNeighbours(upDirection)) {
-                p.addNeighbour(upDirection, getBottomVertex());
-                getBottomVertex().addNeighbour(!upDirection, p);
+        graph.stream().skip(1).forEach(p -> {
+            if (p.noNeighbours(false)) {
+                p.addNeighbour(false, getBottomVertex());
+                getBottomVertex().addNeighbour(true, p);
             }
-        }
+        });
         willInsertIntoTaxonomy = false;
         // after finalisation one shouldn't add
         // new entries to taxonomy
@@ -331,12 +300,9 @@ public class Taxonomy implements Serializable {
     /** unlink the bottom from the taxonomy */
     @PortedFrom(file = "Taxonomy.h", name = "deFinalise")
     public void deFinalise() {
-        boolean upDirection = true;
         TaxonomyVertex bot = getBottomVertex();
-        for (TaxonomyVertex p : bot.neigh(upDirection)) {
-            p.removeLink(!upDirection, bot);
-        }
-        bot.clearLinks(upDirection);
+        bot.neigh(true).forEach(p -> p.removeLink(false, bot));
+        bot.clearLinks(true);
         willInsertIntoTaxonomy = true;  // it's possible again to add entries
     }
 
@@ -352,8 +318,7 @@ public class Taxonomy implements Serializable {
             syn.setVertexAsHost(currentEntry);
         } else {
             syn.addSynonym(currentEntry);
-            options.getLog().print("\nTAX:set ", currentEntry.getName(),
-                    " equal ", syn.getPrimer().getName());
+            options.getLog().print("\nTAX:set ", currentEntry.getIRI(), " equal ", syn.getPrimer().getIRI());
         }
     }
 
@@ -378,7 +343,9 @@ public class Taxonomy implements Serializable {
     // ------------------------------------------------------------------------------
     // -- classification support
     // ------------------------------------------------------------------------------
-    /** @return true if current entry is a synonym of an already classified one */
+    /**
+     * @return true if current entry is a synonym of an already classified one
+     */
     @PortedFrom(file = "TaxonomyCreator.cpp", name = "processSynonym")
     protected boolean processSynonym() {
         ClassifiableEntry currentEntry = current.getPrimer();
@@ -386,7 +353,6 @@ public class Taxonomy implements Serializable {
         if (syn.equals(currentEntry)) {
             return false;
         }
-        // assert willInsertIntoTaxonomy;
         if (syn.isClassified()) {
             addCurrentToSynonym(syn.getTaxVertex());
             return true;

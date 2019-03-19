@@ -12,26 +12,11 @@ import java.util.Set;
 import org.semanticweb.owlapi.model.IRI;
 
 /** datatype union */
-public class DatatypeUnion implements
-        DatatypeCombination<DatatypeUnion, Datatype<?>> {
+public class DatatypeUnion implements DatatypeCombination<DatatypeUnion, Datatype<?>> {
 
-    private final Set<Datatype<?>> basics = new HashSet<Datatype<?>>();
+    private final Set<Datatype<?>> basics = new HashSet<>();
     private final IRI uri;
     private final Datatype<?> host;
-
-    /**
-     * @param host
-     *        host
-     */
-    public DatatypeUnion(Datatype<?> host) {
-        uri = IRI.create("urn:union#a" + DatatypeFactory.getIndex());
-        this.host = host;
-    }
-
-    @Override
-    public Datatype<?> getHost() {
-        return host;
-    }
 
     /**
      * @param host
@@ -42,6 +27,20 @@ public class DatatypeUnion implements
     public DatatypeUnion(Datatype<?> host, Collection<Datatype<?>> list) {
         this(host);
         basics.addAll(list);
+    }
+
+    /**
+     * @param host
+     *        host
+     */
+    public DatatypeUnion(Datatype<?> host) {
+        uri = DatatypeFactory.getIndex("urn:union#a").getIRI();
+        this.host = host;
+    }
+
+    @Override
+    public Datatype<?> getHost() {
+        return host;
     }
 
     @Override
@@ -63,12 +62,7 @@ public class DatatypeUnion implements
         if (!host.isCompatible(l)) {
             return false;
         }
-        for (Datatype<?> d : basics) {
-            if (d.isCompatible(l)) {
-                return true;
-            }
-        }
-        return false;
+        return basics.stream().anyMatch(d -> d.isCompatible(l));
     }
 
     @Override
@@ -83,12 +77,7 @@ public class DatatypeUnion implements
         if (!host.isCompatible(type)) {
             return false;
         }
-        for (Datatype<?> d : basics) {
-            if (d.isCompatible(type)) {
-                return true;
-            }
-        }
-        return false;
+        return basics.stream().anyMatch(d -> d.isCompatible(type));
     }
 
     @Override
@@ -98,15 +87,9 @@ public class DatatypeUnion implements
 
     @Override
     public boolean emptyValueSpace() {
-        for (Datatype<?> d : basics) {
-            if (!d.isExpression()) {
-                return false;
-            }
-            if (!d.asExpression().emptyValueSpace()) {
-                return false;
-            }
-        }
-        return true;
+        // value space is empty if all the basics are expressions with empty
+        // value space
+        return basics.stream().allMatch(d -> d.isExpression() && d.asExpression().emptyValueSpace());
     }
 
     @Override

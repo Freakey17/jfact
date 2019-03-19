@@ -10,16 +10,14 @@ import java.io.Serializable;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.vocab.OWLRDFVocabulary;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.PortedFrom;
 
 /** data top */
 @PortedFrom(file = "tDLExpression.h", name = "TDLDataTop")
 public class DataTop implements DataExpression, Serializable {
-
-    private static final long serialVersionUID = 11000L;
 
     @Override
     @PortedFrom(file = "tDLExpression.h", name = "accept")
@@ -35,11 +33,11 @@ public class DataTop implements DataExpression, Serializable {
 
     @Override
     public String toString() {
-        return getName().toString();
+        return getIRI().toString();
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return OWLRDFVocabulary.RDFS_LITERAL.getIRI();
     }
 }

@@ -56,8 +56,8 @@ public enum Token {
 
     /** @return name */
     public String getName() {
-            return s;
-        }
+        return s;
+    }
 
     @Override
     public String toString() {

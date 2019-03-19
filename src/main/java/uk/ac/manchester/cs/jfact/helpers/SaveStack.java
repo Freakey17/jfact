@@ -20,9 +20,9 @@ import conformance.PortedFrom;
 @PortedFrom(file = "tSaveStack.h", name = "TSaveStack")
 public class SaveStack<T> implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
+
     @Original
-    protected final LinkedList<T> list = new LinkedList<T>();
+    protected final LinkedList<T> list = new LinkedList<>();
 
     /**
      * @param depth

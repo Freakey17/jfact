@@ -9,29 +9,26 @@ import java.io.Serializable;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ObjectRoleArg;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ObjectRoleExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** object role inverse */
 @PortedFrom(file = "tDLExpression.h", name = "TDLObjectRoleInverse")
-public class ObjectRoleInverse implements ObjectRoleExpression, ObjectRoleArg,
-        Serializable {
+public class ObjectRoleInverse implements ObjectRoleExpression, ObjectRoleArg, Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** object role argument */
-    @Original
-    private final ObjectRoleExpression objectRoleExpression;
+    @Original private final ObjectRoleExpression objectRoleExpression;
 
     /**
-     * @param R
+     * @param r
      *        R
      */
-    public ObjectRoleInverse(ObjectRoleExpression R) {
-        objectRoleExpression = R;
+    public ObjectRoleInverse(ObjectRoleExpression r) {
+        objectRoleExpression = r;
     }
 
     @Override
@@ -54,7 +51,12 @@ public class ObjectRoleInverse implements ObjectRoleExpression, ObjectRoleArg,
     }
 
     @Override
-    public IRI getName() {
-        return IRI.create(toString());
+    public IRI getIRI() {
+        return IRI.create("inverse(" + objectRoleExpression + ")");
+    }
+
+    @Override
+    public String toString() {
+        return getIRI().toString();
     }
 }

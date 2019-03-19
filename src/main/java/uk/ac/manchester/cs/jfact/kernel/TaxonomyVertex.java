@@ -5,56 +5,68 @@ package uk.ac.manchester.cs.jfact.kernel;
  This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
  This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
+import static java.util.stream.Collectors.joining;
+import static org.semanticweb.owlapi.util.OWLAPIPreconditions.checkNotNull;
+import static org.semanticweb.owlapi.util.OWLAPIStreamUtils.asList;
+import static uk.ac.manchester.cs.jfact.helpers.Helper.elementFromIntersection;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.stream.Stream;
+
+import javax.annotation.Nullable;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.helpers.LogAdapter;
 import uk.ac.manchester.cs.jfact.helpers.Templates;
 import uk.ac.manchester.cs.jfact.kernel.options.JFactReasonerConfiguration;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** taxonomy vertex */
 @PortedFrom(file = "taxVertex.h", name = "TaxonomyVertex")
 public class TaxonomyVertex implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** immediate parents and children */
-    @PortedFrom(file = "taxVertex.h", name = "Links")
-    private LinkedHashSet<TaxonomyVertex> linksParent = new LinkedHashSet<TaxonomyVertex>();
-    @PortedFrom(file = "taxVertex.h", name = "Links")
-    private LinkedHashSet<TaxonomyVertex> linksChild = new LinkedHashSet<TaxonomyVertex>();
+    @PortedFrom(file = "taxVertex.h", name = "Links") private LinkedHashSet<TaxonomyVertex> linksParent = new LinkedHashSet<>();
+    @PortedFrom(file = "taxVertex.h", name = "Links") private LinkedHashSet<TaxonomyVertex> linksChild = new LinkedHashSet<>();
     /** entry corresponding to current tax vertex */
-    @PortedFrom(file = "taxVertex.h", name = "sample")
-    private ClassifiableEntry sample = null;
+    @PortedFrom(file = "taxVertex.h", name = "sample") private ClassifiableEntry sample = null;
     /** synonyms of the sample entry */
-    @PortedFrom(file = "taxVertex.h", name = "synonyms")
-    private Set<ClassifiableEntry> synonyms = new LinkedHashSet<ClassifiableEntry>();
+    @PortedFrom(file = "taxVertex.h", name = "synonyms") private Set<ClassifiableEntry> synonyms = new LinkedHashSet<>();
     // labels for different purposes. all for 2 directions: top-down and
     // bottom-up search
     /** flag if given vertex was checked; connected with checkLab */
-    @PortedFrom(file = "taxVertex.h", name = "checked")
-    private long checked;
+    @PortedFrom(file = "taxVertex.h", name = "checked") private long checked;
     /** flag if given vertex has value; connected with valuedLab */
-    @Original
-    private long isValued;
+    @Original private long isValued;
     /** number of common parents of a node */
-    @PortedFrom(file = "taxVertex.h", name = "common")
-    private int common;
+    @PortedFrom(file = "taxVertex.h", name = "common") private int common;
     /** satisfiability value of a valued vertex */
-    @PortedFrom(file = "taxVertex.h", name = "checkValue")
-    private boolean checkValue;
+    @PortedFrom(file = "taxVertex.h", name = "checkValue") private boolean checkValue;
     /** flag to check whether the vertex is in use */
-    @PortedFrom(file = "taxVertex.h", name = "inUse")
-    private boolean inUse = true;
+    @PortedFrom(file = "taxVertex.h", name = "inUse") private boolean inUse = true;
+
+    /** Default constructor. */
+    public TaxonomyVertex() {
+        initFlags();
+    }
+
+    /**
+     * init c'tor; use it only for Top/Bot initialisations
+     * 
+     * @param p
+     *        p
+     */
+    public TaxonomyVertex(ClassifiableEntry p) {
+        initFlags();
+        setSample(p, true);
+    }
 
     /**
      * mark vertex as the one corresponding to a given ENTRY
@@ -79,7 +91,7 @@ public class TaxonomyVertex implements Serializable {
     public void setSample(ClassifiableEntry entry, boolean linkBack) {
         sample = entry;
         if (linkBack) {
-            entry.setTaxVertex(this);
+            setVertexAsHost(entry);
         }
     }
 
@@ -89,8 +101,8 @@ public class TaxonomyVertex implements Serializable {
      * @return Links
      */
     @PortedFrom(file = "taxVertex.h", name = "neigh")
-    public Iterable<TaxonomyVertex> neigh(boolean upDirection) {
-        return upDirection ? linksParent : linksChild;
+    public Stream<TaxonomyVertex> neigh(boolean upDirection) {
+        return upDirection ? linksParent.stream() : linksChild.stream();
     }
 
     // checked part
@@ -190,24 +202,8 @@ public class TaxonomyVertex implements Serializable {
     // get info about taxonomy structure
     /** @return synonyms */
     @PortedFrom(file = "taxVertex.h", name = "begin_syn")
-    public Set<ClassifiableEntry> synonyms() {
-        return synonyms;
-    }
-
-    /** default constructor */
-    public TaxonomyVertex() {
-        initFlags();
-    }
-
-    /**
-     * init c'tor; use it only for Top/Bot initialisations
-     * 
-     * @param p
-     *        p
-     */
-    public TaxonomyVertex(ClassifiableEntry p) {
-        initFlags();
-        setSample(p, true);
+    public Stream<ClassifiableEntry> synonyms() {
+        return synonyms.stream();
     }
 
     /**
@@ -247,12 +243,16 @@ public class TaxonomyVertex implements Serializable {
      */
     @PortedFrom(file = "taxVertex.h", name = "addNeighbour")
     public void addNeighbour(boolean upDirection, TaxonomyVertex p) {
-        if (p == null) {
-            throw new IllegalArgumentException("p cannot be null");
-        }
+        checkNotNull(p, "p cannot be null");
         add(upDirection, p);
     }
 
+    /**
+     * @param direction
+     *        parent or child direction
+     * @param t
+     *        vertex to add
+     */
     public void add(boolean direction, TaxonomyVertex t) {
         if (direction) {
             linksParent.add(t);
@@ -275,18 +275,14 @@ public class TaxonomyVertex implements Serializable {
         }
     }
 
-    /** @return v if node represents a synonym (v=Up[i]==Down[j]); null otherwise */
+    /**
+     * @return v if node represents a synonym (v=Up[i]==Down[j]); null otherwise
+     */
+    @Nullable
     @PortedFrom(file = "taxVertex.h", name = "getSynonymNode")
     public TaxonomyVertex getSynonymNode() {
         // try to find Vertex such that Vertex\in Up and Vertex\in Down
-        for (TaxonomyVertex q : neigh(true)) {
-            for (TaxonomyVertex r : neigh(false)) {
-                if (q.equals(r)) {
-                    return q;
-                }
-            }
-        }
-        return null;
+        return elementFromIntersection(linksParent, linksChild).orElse(null);
     }
 
     /**
@@ -319,7 +315,6 @@ public class TaxonomyVertex implements Serializable {
         return linksChild.remove(p);
     }
 
-    // TODO does not work with synonyms
     /**
      * @param c
      *        c
@@ -327,35 +322,29 @@ public class TaxonomyVertex implements Serializable {
     @PortedFrom(file = "taxVertex.h", name = "incorporate")
     public void incorporate(JFactReasonerConfiguration c) {
         // setup links
-        for (TaxonomyVertex d : neigh(false)) {
-            for (TaxonomyVertex u : neigh(true)) {
+        for (TaxonomyVertex d : linksChild) {
+            // remove all down links
+            for (TaxonomyVertex u : linksParent) {
                 if (d.removeLink(true, u)) {
                     u.removeLink(false, d);
                 }
             }
-            d.removeLink(/* upDirection= */true, this);
+            // add new link between v and current
             // safe in general case, crucial for incremental
+            d.removeLink(true, this);
             d.addNeighbour(true, this);
         }
-        for (TaxonomyVertex u : neigh(true)) {
-            u.addNeighbour(false, this);
-        }
+        // add new link between v and current
+        neigh(true).forEach(u -> u.addNeighbour(false, this));
         if (c.isLoggingActive()) {
             LogAdapter logAdapter = c.getLog();
-            logAdapter.printTemplate(Templates.INCORPORATE, sample.getName());
-            logAdapter.print(names(neigh(true)));
-            logAdapter.print("} and down = {");
-            logAdapter.print(names(neigh(false)));
-            logAdapter.print("}");
+            logAdapter.printTemplate(Templates.INCORPORATE, sample.getIRI()).print(names(linksParent))
+                .print("} and down = {").print(names(linksChild)).print("}");
         }
     }
 
-    Iterable<IRI> names(Iterable<TaxonomyVertex> l) {
-        List<IRI> toReturn = new ArrayList<IRI>();
-        for (TaxonomyVertex t : l) {
-            toReturn.add(t.sample.getName());
-        }
-        return toReturn;
+    Iterable<IRI> names(Collection<TaxonomyVertex> l) {
+        return asList(l.stream().map(t -> t.sample.getIRI()));
     }
 
     /**
@@ -366,9 +355,7 @@ public class TaxonomyVertex implements Serializable {
      */
     @PortedFrom(file = "taxVertex.h", name = "removeLinks")
     public void removeLinks(boolean upDirection) {
-        for (TaxonomyVertex p : neigh(upDirection)) {
-            p.removeLink(!upDirection, this);
-        }
+        neigh(upDirection).forEach(p -> p.removeLink(!upDirection, this));
         clearLinks(upDirection);
     }
 
@@ -408,28 +395,23 @@ public class TaxonomyVertex implements Serializable {
      *        curEntry
      */
     @PortedFrom(file = "taxVertex.h", name = "mergeIndepNode")
-    public void mergeIndepNode(TaxonomyVertex node,
-            Set<TaxonomyVertex> excludes, ClassifiableEntry curEntry) {
+    public void mergeIndepNode(TaxonomyVertex node, Set<TaxonomyVertex> excludes, ClassifiableEntry curEntry) {
         // copy synonyms here
         if (!node.getPrimer().equals(curEntry)) {
             addSynonym(node.getPrimer());
         }
-        for (ClassifiableEntry q : node.synonyms()) {
-            addSynonym(q);
-        }
-        boolean upDirection = true;
-        for (TaxonomyVertex p : node.neigh(upDirection)) {
+        node.synonyms().forEach(this::addSynonym);
+        for (TaxonomyVertex p : linksParent) {
             if (!excludes.contains(p)) {
-                addNeighbour(upDirection, p);
+                addNeighbour(true, p);
             }
-            p.removeLink(!upDirection, node);
+            p.removeLink(false, node);
         }
-        upDirection = false;
-        for (TaxonomyVertex p : node.neigh(upDirection)) {
+        for (TaxonomyVertex p : linksChild) {
             if (!excludes.contains(p)) {
-                addNeighbour(upDirection, p);
+                addNeighbour(false, p);
             }
-            p.removeLink(!upDirection, node);
+            p.removeLink(true, node);
         }
     }
 
@@ -439,16 +421,10 @@ public class TaxonomyVertex implements Serializable {
         assert sample != null;
         StringBuilder o = new StringBuilder();
         if (synonyms.isEmpty()) {
-            o.append('"');
-            o.append(sample.getName());
-            o.append('"');
+            o.append('"').append(sample.getIRI()).append('"');
         } else {
-            o.append("(\"");
-            o.append(sample.getName());
-            for (ClassifiableEntry q : synonyms()) {
-                o.append("\"=\"");
-                o.append(q.getName());
-            }
+            o.append("(\"").append(sample.getIRI());
+            o.append(synonyms().map(ClassifiableEntry::getIRI).collect(joining("\"=\"")));
             o.append("\")");
         }
         return o.toString();
@@ -462,35 +438,16 @@ public class TaxonomyVertex implements Serializable {
     @PortedFrom(file = "taxVertex.h", name = "printNeighbours")
     private static String printNeighbours(Collection<TaxonomyVertex> list) {
         StringBuilder o = new StringBuilder();
-        o.append(" {");
-        o.append(list.size());
-        o.append(':');
-        TreeSet<TaxonomyVertex> sorted = new TreeSet<TaxonomyVertex>(
-                new Comparator<TaxonomyVertex>() {
-
-                    @Override
-                    public int compare(TaxonomyVertex o1, TaxonomyVertex o2) {
-                        return o1.getPrimer().getName()
-                                .compareTo(o2.getPrimer().getName());
-                    }
-                });
-        sorted.addAll(list);
-        for (TaxonomyVertex p : sorted) {
-            o.append(" \"");
-            o.append(p.sample.getName());
-            o.append('"');
-        }
+        o.append(" {").append(list.size()).append(':');
+        List<TaxonomyVertex> l = new ArrayList<>(list);
+        l.sort((o1, o2) -> o1.getPrimer().getIRI().compareTo(o2.getPrimer().getIRI()));
+        l.forEach(p -> o.append(" \"").append(p.sample.getIRI()).append('"'));
         o.append('}');
         return o.toString();
     }
 
     @Override
     public String toString() {
-        StringBuilder b = new StringBuilder();
-        b.append(printSynonyms());
-        b.append(printNeighbours(linksParent));
-        b.append(printNeighbours(linksChild));
-        b.append('\n');
-        return b.toString();
+        return printSynonyms() + printNeighbours(linksParent) + printNeighbours(linksChild) + '\n';
     }
 }

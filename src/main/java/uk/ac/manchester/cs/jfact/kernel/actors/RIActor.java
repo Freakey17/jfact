@@ -1,27 +1,20 @@
 package uk.ac.manchester.cs.jfact.kernel.actors;
 
-/* This file is part of the JFact DL reasoner
- Copyright 2011-2013 by Ignazio Palmisano, Dmitry Tsarkov, University of Manchester
- This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
- This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
- You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.ClassifiableEntry;
 import uk.ac.manchester.cs.jfact.kernel.Concept;
 import uk.ac.manchester.cs.jfact.kernel.Individual;
 import uk.ac.manchester.cs.jfact.kernel.TaxonomyVertex;
-import conformance.PortedFrom;
 
 /** RI actor */
 @PortedFrom(file = "Kernel.cpp", name = "RIActor")
-public class RIActor implements Actor, Serializable {
+public class RIActor extends TaxGatheringWalker {
 
-    private static final long serialVersionUID = 11000L;
-    private final List<Individual> acc = new ArrayList<Individual>();
+    private final List<Individual> acc = new ArrayList<>();
 
     /**
      * process single entry in a vertex label
@@ -30,9 +23,10 @@ public class RIActor implements Actor, Serializable {
      *        p
      * @return true if try successful
      */
+    @Override
     protected boolean tryEntry(ClassifiableEntry p) {
         // check the applicability
-        if (p.isSystem() || !((Concept) p).isSingleton()) {
+        if (p.isSystem() || !applicable(p)) {
             return false;
         }
         // print the concept
@@ -41,12 +35,15 @@ public class RIActor implements Actor, Serializable {
     }
 
     @Override
+    protected boolean applicable(ClassifiableEntry entry) {
+        return ((Concept) entry).isSingleton();
+    }
+
+    @Override
     public boolean apply(TaxonomyVertex v) {
-        boolean ret = tryEntry(v.getPrimer());
-        for (ClassifiableEntry p : v.synonyms()) {
-            ret |= tryEntry(p);
-        }
-        return ret;
+        AtomicBoolean ret = new AtomicBoolean(tryEntry(v.getPrimer()));
+        v.synonyms().forEach(p -> ret.compareAndSet(false, tryEntry(p)));
+        return ret.get();
     }
 
     @Override
@@ -54,12 +51,7 @@ public class RIActor implements Actor, Serializable {
         if (test(v.getPrimer())) {
             return true;
         }
-        for (ClassifiableEntry p : v.synonyms()) {
-            if (test(p)) {
-                return true;
-            }
-        }
-        return false;
+        return v.synonyms().anyMatch(RIActor::test);
     }
 
     private static boolean test(ClassifiableEntry p) {
@@ -74,9 +66,5 @@ public class RIActor implements Actor, Serializable {
     /** @return accumulator */
     public List<Individual> getAcc() {
         return acc;
-    }
-
-    @Override
-    public void removePastBoundaries(Collection<TaxonomyVertex> pastBoundary) {
     }
 }

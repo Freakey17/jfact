@@ -6,24 +6,30 @@ import org.semanticweb.owlapi.reasoner.OWLReasonerFactory;
 
 import uk.ac.manchester.cs.jfact.JFactFactory;
 
+/**
+ * @author ignazio
+ */
 public class JFactProtegeFactory extends AbstractProtegeOWLReasonerInfo {
-	private JFactFactory fac;
 
-	@Override
-	public void initialise() throws Exception {
-		fac = new JFactFactory();
-	}
+    private JFactFactory fac;
 
-	@Override
-	public void dispose() throws Exception {
-		fac = null;
-	}
+    @Override
+    public void initialise() {
+        fac = new JFactFactory();
+    }
 
-	public BufferingMode getRecommendedBuffering() {
-		return BufferingMode.BUFFERING;
-	}
+    @Override
+    public void dispose() {
+        fac = null;
+    }
 
-	public OWLReasonerFactory getReasonerFactory() {
-		return fac;
-	}
+    @Override
+    public BufferingMode getRecommendedBuffering() {
+        return BufferingMode.BUFFERING;
+    }
+
+    @Override
+    public OWLReasonerFactory getReasonerFactory() {
+        return fac;
+    }
 }

@@ -7,33 +7,30 @@ package uk.ac.manchester.cs.jfact.kernel.dl;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.io.Serializable;
 
+import javax.annotation.Nonnull;
+
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptDataCardinalityExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataRoleArg;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataRoleExpression;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** base class for data cardinality */
 @Original
-public abstract class AbstractConceptDataCardinality implements
-        ConceptDataCardinalityExpression, DataRoleArg, Serializable {
+public abstract class AbstractConceptDataCardinality
+    implements ConceptDataCardinalityExpression, DataRoleArg, Serializable {
 
-    private static final long serialVersionUID = 11000L;
-    @PortedFrom(file = "tDLExpression.h", name = "N")
-    private final int cardinality;
+    @PortedFrom(file = "tDLExpression.h", name = "N") private final int cardinality;
     /** data role argument */
-    @PortedFrom(file = "tDLExpression.h", name = "DR")
-    private final DataRoleExpression dataRoleExpression;
-    @PortedFrom(file = "tDLExpression.h", name = "Expr")
-    private final DataExpression expression;
+    @PortedFrom(file = "tDLExpression.h", name = "DR") private final DataRoleExpression dataRoleExpression;
+    @PortedFrom(file = "tDLExpression.h", name = "Expr") private final DataExpression expression;
 
-    protected AbstractConceptDataCardinality(int n, DataRoleExpression R,
-            DataExpression E) {
-        dataRoleExpression = R;
-        expression = E;
+    protected AbstractConceptDataCardinality(int n, DataRoleExpression r, DataExpression e) {
+        dataRoleExpression = r;
+        expression = e;
         cardinality = n;
     }
 
@@ -56,13 +53,13 @@ public abstract class AbstractConceptDataCardinality implements
     }
 
     @Override
+    @Nonnull
     public String toString() {
-        return "Cardinality(" + cardinality + " " + dataRoleExpression + " "
-                + expression;
+        return "Cardinality(" + cardinality + " " + dataRoleExpression + " " + expression;
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return IRI.create(toString());
     }
 }

@@ -5,17 +5,19 @@ package uk.ac.manchester.cs.jfact.datatypes;
  This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.
  This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
+import static org.semanticweb.owlapi.util.OWLAPIPreconditions.checkNotNull;
 import static uk.ac.manchester.cs.jfact.datatypes.DatatypeClashes.*;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import uk.ac.manchester.cs.jfact.dep.DepSet;
-import uk.ac.manchester.cs.jfact.helpers.FastSetSimple;
 
 /**
  * @author ignazio
@@ -24,25 +26,21 @@ import uk.ac.manchester.cs.jfact.helpers.FastSetSimple;
  */
 public class DataTypeSituation<R extends Comparable<R>> implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** positive type appearance */
     private DepSet pType;
     /** negative type appearance */
     private DepSet nType;
     /** interval of possible values */
-    private Set<DepInterval<R>> constraints = new HashSet<DepInterval<R>>();
+    private Set<DepInterval<R>> constraints = new HashSet<>();
     /** accumulated dep-set */
     private final DepSet accDep = DepSet.create();
     /** dep-set for the clash */
     private final DataTypeReasoner reasoner;
-    private final Datatype<R> type;
-    private final List<Literal<?>> literals = new ArrayList<Literal<?>>();
+    @Nonnull private final Datatype<R> type;
+    private final List<Literal<?>> literals = new ArrayList<>();
 
     protected DataTypeSituation(Datatype<R> p, DataTypeReasoner dep) {
-        if (p == null) {
-            throw new IllegalArgumentException("p cannot be null");
-        }
-        this.type = p;
+        this.type = checkNotNull(p);
         this.reasoner = dep;
         this.constraints.add(new DepInterval<R>());
     }
@@ -58,20 +56,13 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
      *        localDep
      * @return true iff clash occurs
      */
-    private boolean addUpdatedInterval(DepInterval<R> i, Datatype<R> interval,
-            DepSet localDep) {
+    private boolean addUpdatedInterval(DepInterval<R> i, Datatype<R> interval, DepSet localDep) {
         if (!i.consistent(interval)) {
             localDep.add(i.locDep);
             this.reasoner.reportClash(localDep, DT_C_IT);
             return true;
         }
-        if (!i.update(interval, localDep)) {
-            this.constraints.add(i);
-        }
-        if (!this.hasPType()) {
-            this.constraints.add(i);
-        }
-        if (!i.checkMinMaxClash()) {
+        if (!i.update(interval, localDep) || !this.hasPType() || !i.checkMinMaxClash()) {
             this.constraints.add(i);
         } else {
             this.accDep.add(i.locDep);
@@ -87,30 +78,24 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
     /**
      * add restrictions [POS]INT to intervals
      * 
-     * @param pos
-     *        pos
      * @param interval
      *        interval
      * @param dep
      *        dep
      * @return true if clash occurs
      */
-    public boolean addInterval(boolean pos, Datatype<R> interval, DepSet dep) {
+    public boolean addInterval(Datatype<R> interval, DepSet dep) {
         if (interval.emptyValueSpace()) {
-            this.reasoner.reportClash(this.accDep, DT_Empty_interval);
+            this.reasoner.reportClash(this.accDep, DT_EMPTY_INTERVAL);
             return true;
         }
         if (interval instanceof DatatypeEnumeration) {
             this.literals.addAll(interval.listValues());
         }
-        Datatype<R> realInterval = pos ? interval : new DatatypeNegation<R>(
-                interval);
         Set<DepInterval<R>> c = this.constraints;
-        this.constraints = new HashSet<DepInterval<R>>();
-        for (DepInterval<R> d : c) {
-            if (this.addUpdatedInterval(d, realInterval, DepSet.create(dep))) {
-                return true;
-            }
+        this.constraints = new HashSet<>();
+        if (c.stream().anyMatch(d -> addUpdatedInterval(d, interval, dep))) {
+            return true;
         }
         if (this.constraints.isEmpty()) {
             this.reasoner.reportClash(this.accDep, DT_C_MM);
@@ -126,20 +111,17 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
             return true;
         }
         for (DepInterval<R> d : this.constraints) {
-            boolean checkMinMaxClash = d.checkMinMaxClash();
-            if (checkMinMaxClash) {
-                d.checkMinMaxClash();
+            if (d.checkMinMaxClash()) {
                 this.accDep.add(d.locDep);
                 this.reasoner.reportClash(this.accDep, DT_C_MM);
-                return checkMinMaxClash;
+                return true;
             }
         }
         return false;
     }
 
     private boolean emptyConstraints() {
-        return this.constraints.isEmpty()
-                || this.constraints.iterator().next().e == null;
+        return this.constraints.isEmpty() || this.constraints.iterator().next().e == null;
     }
 
     /**
@@ -148,12 +130,11 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
      * @return true if compatible
      */
     public boolean checkCompatibleValue(DataTypeSituation<?> other) {
-        if (this.type.equals(DatatypeFactory.LITERAL) && emptyConstraints()
-                || other.type.equals(DatatypeFactory.LITERAL)
-                && other.emptyConstraints()) {
+        if (this.type.equals(DatatypeFactory.LITERAL) && emptyConstraints() || other.type.equals(
+            DatatypeFactory.LITERAL) && other.emptyConstraints()) {
             return true;
         }
-        if (!this.type.isCompatible(other.type)) {
+        if (incompatible(other)) {
             return false;
         }
         if (this.emptyConstraints() && other.emptyConstraints()) {
@@ -165,19 +146,11 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
         if (literals.isEmpty() && emptyConstraints()) {
             return true;
         }
-        List<Literal<?>> allLiterals = new ArrayList<Literal<?>>(this.literals);
+        List<Literal<?>> allLiterals = new ArrayList<>(this.literals);
         allLiterals.addAll(other.literals);
-        List<Datatype<?>> allRestrictions = new ArrayList<Datatype<?>>();
-        for (DepInterval<?> d : other.constraints) {
-            if (d.e != null) {
-                allRestrictions.add(d.e);
-            }
-        }
-        for (DepInterval<?> d : this.constraints) {
-            if (d.e != null) {
-                allRestrictions.add(d.e);
-            }
-        }
+        List<Datatype<?>> allRestrictions = new ArrayList<>();
+        other.constraints.stream().filter(d -> d.e != null).forEach(d -> allRestrictions.add(d.e));
+        constraints.stream().filter(d -> d.e != null).forEach(d -> allRestrictions.add(d.e));
         boolean toReturn = compareLiterals(other, allLiterals, allRestrictions);
         // if signs are the same, return the comparison
         if (hasNType() == other.hasNType() || hasPType() == other.hasPType()) {
@@ -187,25 +160,28 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
             return toReturn;
         }
         // otherwise signs differ and there are no constraints; return the
-        // opposite
-        // example: -short and {0}
+        // opposite.
+        // example: -short and {0}.
         return !toReturn;
     }
 
-    private boolean compareLiterals(DataTypeSituation<?> other,
-            List<Literal<?>> allLiterals, List<Datatype<?>> allRestrictions) {
-        boolean toReturn = true;
+    protected boolean incompatible(DataTypeSituation<?> other) {
+        return !this.type.isCompatible(other.type);
+    }
+
+    private boolean compareLiterals(DataTypeSituation<?> other, List<Literal<?>> allLiterals,
+        List<Datatype<?>> allRestrictions) {
         for (Literal<?> l : allLiterals) {
             if (!this.type.isCompatible(l) || !other.type.isCompatible(l)) {
-                toReturn = false;
+                return false;
             }
             for (Datatype<?> d : allRestrictions) {
                 if (!d.isCompatible(l)) {
-                    toReturn = false;
+                    return false;
                 }
             }
         }
-        return toReturn;
+        return true;
     }
 
     /**
@@ -216,10 +192,9 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
      */
     static class DepInterval<R extends Comparable<R>> implements Serializable {
 
-        private static final long serialVersionUID = 11000L;
         protected DatatypeExpression<R> e;
         /** local dep-set */
-        protected FastSetSimple locDep;
+        protected DepSet locDep;
 
         @Override
         public String toString() {
@@ -235,43 +210,33 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
          *        dep
          * @return true if updated
          */
-        @SuppressWarnings("rawtypes")
-        public boolean update(Datatype<R> value, DepSet dep) {
+        public boolean update(Datatype<R> value, @Nullable DepSet dep) {
             if (this.e == null) {
                 if (value.isExpression()) {
                     this.e = value.asExpression();
                 } else {
-                    this.e = DatatypeFactory.getDatatypeExpression(value);
+                    this.e = value.wrapAsDatatypeExpression();
                 }
                 if (locDep == null) {
-                    locDep = dep == null ? null : dep.getDelegate();
+                    locDep = dep;
                 } else if (dep != null) {
-                    locDep.addAll(dep.getDelegate());
+                    locDep.add(dep);
                 }
                 return false;
             } else {
-                // TODO compare value spaces
-                if (this.e instanceof DatatypeEnumeration
-                        || this.e instanceof DatatypeNegation) {
+                if (this.e instanceof DatatypeEnumeration || this.e instanceof DatatypeNegation) {
                     // cannot update an enumeration
                     return false;
                 }
-                for (Map.Entry<Facet, Comparable> f : value
-                        .getKnownNumericFacetValues().entrySet()) {
-                    this.e = this.e.addNumericFacet(f.getKey(), f.getValue());
-                }
-                for (Map.Entry<Facet, Comparable> f : value
-                        .getKnownNonNumericFacetValues().entrySet()) {
-                    this.e = this.e
-                            .addNonNumericFacet(f.getKey(), f.getValue());
-                }
+                value.getKnownNumericFacetValues().forEach((k, v) -> e = e.addNumericFacet(k, v));
+                value.getKnownNonNumericFacetValues().forEach((k, v) -> e = e.addNonNumericFacet(k, v));
             }
             // TODO needs to return false if the new expression has the same
             // value space as the old one
             if (locDep == null) {
-                locDep = dep == null ? null : dep.getDelegate();
+                locDep = dep;
             } else if (dep != null) {
-                locDep.addAll(dep.getDelegate());
+                locDep.add(dep);
             }
             return true;
         }
@@ -285,14 +250,12 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
             if (this.e == null) {
                 return true;
             } else {
-                // TODO compare value spaces
                 if (this.e instanceof DatatypeNegation) {
                     // cannot update a negation
                     return false;
                 }
                 // XXX this needs to be more general
-                if (e instanceof DatatypeEnumeration
-                        && interval instanceof DatatypeEnumeration) {
+                if (e instanceof DatatypeEnumeration && interval instanceof DatatypeEnumeration) {
                     return true;
                 }
             }
@@ -306,8 +269,8 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
          *        type
          * @return true if consistent
          */
-        private boolean consistent(Datatype<R> type) {
-            return this.e == null || this.e.isCompatible(type);
+        boolean consistent(@Nullable Datatype<?> type) {
+            return this.e == null || type == null || this.e.isCompatible(type);
         }
 
         public boolean checkMinMaxClash() {
@@ -318,14 +281,13 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
         }
 
         @Override
-        public boolean equals(Object obj) {
+        public boolean equals(@Nullable Object obj) {
             if (super.equals(obj)) {
                 return true;
             }
             if (obj instanceof DepInterval) {
-                return (this.e == null ? ((DepInterval<?>) obj).e == null
-                        : this.e.equals(((DepInterval<?>) obj).e))
-                        && this.locDep == null ? ((DepInterval<?>) obj).locDep == null
+                return (this.e == null ? ((DepInterval<?>) obj).e == null : this.e.equals(((DepInterval<?>) obj).e))
+                    && this.locDep == null ? ((DepInterval<?>) obj).locDep == null
                         : this.locDep.equals(((DepInterval<?>) obj).locDep);
             }
             return false;
@@ -333,8 +295,7 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
 
         @Override
         public int hashCode() {
-            return (this.e == null ? 0 : this.e.hashCode())
-                    + (this.locDep == null ? 0 : this.locDep.hashCode());
+            return (this.e == null ? 0 : this.e.hashCode()) + (this.locDep == null ? 0 : this.locDep.hashCode());
         }
     }
 
@@ -387,7 +348,44 @@ public class DataTypeSituation<R extends Comparable<R>> implements Serializable 
 
     @Override
     public String toString() {
-        return this.getClass().getSimpleName() + ' ' + type + ' '
-                + this.constraints;
+        return this.getClass().getSimpleName() + ' ' + type + ' ' + this.constraints;
+    }
+
+    private boolean hasNoConstraints() {
+        return constraints.isEmpty() || constraints.stream().allMatch(c -> c.e == null);
+    }
+
+    private boolean hasConstraints() {
+        return !constraints.isEmpty() || constraints.stream().anyMatch(c -> c.e != null);
+    }
+
+    /**
+     * @param other
+     *        situation to test
+     * @return true if this situation represents a subtype of the other
+     *         situation, i.e., type is a subtype of other type and all
+     *         constraints in this situation are compatible with other
+     *         constraints
+     */
+    public boolean isSubType(DataTypeSituation<?> other) {
+        // if the types are not compatible, this is not subtype of the input
+        if (incompatible(other)) {
+            return false;
+        }
+        if (!type.isSubType(other.type)) {
+            return false;
+        }
+        // if the supertype does nto have any constraints, the result must be
+        // true
+        if (other.hasNoConstraints()) {
+            return true;
+        }
+        // same type but other has constraints and this does not: this cannot be
+        // a subtype
+        if (type.equals(other.type) && hasConstraints()) {
+            return false;
+        }
+        // each constraint must be compatible with the supertype
+        return constraints.stream().allMatch(c -> other.constraints.stream().allMatch(c1 -> c.consistent(c1.e)));
     }
 }

@@ -9,36 +9,32 @@ import java.io.Serializable;
 
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.datatypes.Literal;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptDataRoleExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpressionArg;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataRoleExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** concept data value */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptDataValue")
-public class ConceptDataValue implements ConceptDataRoleExpression,
-        DataExpressionArg<Literal<?>>, Serializable {
+public class ConceptDataValue implements ConceptDataRoleExpression, DataExpressionArg<Literal<?>>, Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** data expression argument */
-    @PortedFrom(file = "tDLAxiom.h", name = "Expr")
-    protected final Literal<?> dataValue;
-    @Original
-    private final DataRoleExpression delegate;
+    @PortedFrom(file = "tDLAxiom.h", name = "Expr") protected final Literal<?> dataValue;
+    @Original private final DataRoleExpression delegate;
 
     /**
-     * @param R
+     * @param r
      *        R
-     * @param V
+     * @param v
      *        V
      */
-    public ConceptDataValue(DataRoleExpression R, Literal<?> V) {
-        dataValue = V;
-        delegate = R;
+    public ConceptDataValue(DataRoleExpression r, Literal<?> v) {
+        dataValue = v;
+        delegate = r;
     }
 
     @Override
@@ -66,7 +62,12 @@ public class ConceptDataValue implements ConceptDataRoleExpression,
     }
 
     @Override
-    public IRI getName() {
-        return IRI.create(toString());
+    public IRI getIRI() {
+        return IRI.create("dataValue(" + delegate + " " + dataValue + ")");
+    }
+
+    @Override
+    public String toString() {
+        return getIRI().toString();
     }
 }

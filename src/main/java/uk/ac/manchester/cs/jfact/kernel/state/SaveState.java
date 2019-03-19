@@ -13,12 +13,12 @@ import conformance.PortedFrom;
 @PortedFrom(file = "CGLabel.h", name = "SaveState")
 public class SaveState implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
+
     /** states for simple-, complex- and extra labels */
     private int sc;
     private int cc;
 
-    /** default constructor */
+    /** Default constructor. */
     public SaveState() {
         sc = Integer.MAX_VALUE;
         cc = Integer.MAX_VALUE;

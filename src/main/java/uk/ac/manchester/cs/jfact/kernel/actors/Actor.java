@@ -7,26 +7,17 @@ package uk.ac.manchester.cs.jfact.kernel.actors;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.util.Collection;
 
-import uk.ac.manchester.cs.jfact.kernel.TaxonomyVertex;
 import conformance.PortedFrom;
+import uk.ac.manchester.cs.jfact.kernel.TaxonomyVertex;
 
 /** Actor interface */
 @PortedFrom(file = "Actor.h", name = "Actor")
-public interface Actor {
-
-    /**
-     * taxonomy walking method.
-     * 
-     * @param v
-     *        v
-     * @return true if node was processed, false if node can not be processed in
-     *         current settings
-     */
-    @PortedFrom(file = "Actor.h", name = "apply")
-    boolean apply(TaxonomyVertex v);
+public interface Actor extends WalkerInterface {
 
     /** clear collections */
-    void clear();
+    default void clear() {
+        // nothing to do as default
+    }
 
     /**
      * @param v
@@ -35,5 +26,9 @@ public interface Actor {
      */
     boolean applicable(TaxonomyVertex v);
 
-    void removePastBoundaries(Collection<TaxonomyVertex> pastBoundary);
+    /**
+     * @param pastBoundary
+     *        nodes to remove
+     */
+    default void removePastBoundaries(@SuppressWarnings("unused") Collection<TaxonomyVertex> pastBoundary) {}
 }

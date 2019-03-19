@@ -7,38 +7,36 @@ package uk.ac.manchester.cs.jfact.kernel.dl;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.io.Serializable;
 
+import javax.annotation.Nonnull;
+
 import org.semanticweb.owlapi.model.IRI;
 
+import conformance.Original;
+import conformance.PortedFrom;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.ConceptDataRVExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataExpression;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataRoleArg;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.DataRoleExpression;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitor;
 import uk.ac.manchester.cs.jfact.visitors.DLExpressionVisitorEx;
-import conformance.Original;
-import conformance.PortedFrom;
 
 /** forall data restriction */
 @PortedFrom(file = "tDLExpression.h", name = "TDLConceptDataForall")
-public class ConceptDataForall implements ConceptDataRVExpression, DataRoleArg,
-        Serializable {
+public class ConceptDataForall implements ConceptDataRVExpression, DataRoleArg, Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** data role argument */
-    @PortedFrom(file = "tDLExpression.h", name = "DR")
-    private final DataRoleExpression dataRoleExpression;
-    @Original
-    private final DataExpression delegate;
+    @PortedFrom(file = "tDLExpression.h", name = "DR") private final DataRoleExpression dataRoleExpression;
+    @Original private final DataExpression delegate;
 
     /**
-     * @param R
+     * @param r
      *        R
-     * @param E
+     * @param e
      *        E
      */
-    public ConceptDataForall(DataRoleExpression R, DataExpression E) {
-        dataRoleExpression = R;
-        delegate = E;
+    public ConceptDataForall(DataRoleExpression r, DataExpression e) {
+        dataRoleExpression = r;
+        delegate = e;
     }
 
     @Override
@@ -66,11 +64,12 @@ public class ConceptDataForall implements ConceptDataRVExpression, DataRoleArg,
     }
 
     @Override
-    public IRI getName() {
+    public IRI getIRI() {
         return IRI.create(toString());
     }
 
     @Override
+    @Nonnull
     public String toString() {
         return "DataForall(" + dataRoleExpression + " " + delegate + ")";
     }

@@ -1,9 +1,14 @@
 package uk.ac.manchester.cs.jfact;
 
+import static org.semanticweb.owlapi.util.OWLAPIPreconditions.verifyNotNull;
+
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
+
+import javax.annotation.Nullable;
 
 import org.semanticweb.owlapi.model.OWLDataFactory;
 import org.semanticweb.owlapi.model.OWLObject;
@@ -12,29 +17,30 @@ import org.semanticweb.owlapi.reasoner.NodeSet;
 import org.semanticweb.owlapi.reasoner.impl.DefaultNode;
 import org.semanticweb.owlapi.reasoner.impl.DefaultNodeSet;
 
-import uk.ac.manchester.cs.jfact.kernel.ExpressionManager;
+import uk.ac.manchester.cs.jfact.kernel.ExpressionCache;
 import uk.ac.manchester.cs.jfact.kernel.dl.interfaces.Entity;
 
-abstract class OWLEntityTranslator<E extends OWLObject, T extends Entity>
-        implements Serializable {
+abstract class OWLEntityTranslator<E extends OWLObject, T extends Entity> implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
-    private final Map<E, T> entity2dlentity = new HashMap<E, T>();
-    private final Map<T, E> dlentity2entity = new HashMap<T, E>();
-    protected final ExpressionManager em;
+    private final Map<E, T> entity2dlentity = new HashMap<>();
+    private final Map<T, E> dlentity2entity = new HashMap<>();
+    protected final ExpressionCache em;
     protected final OWLDataFactory df;
     protected final TranslationMachinery tr;
+
+    protected OWLEntityTranslator(ExpressionCache em, OWLDataFactory df, TranslationMachinery tr) {
+        this.em = em;
+        this.df = df;
+        this.tr = tr;
+        fillTopAndBottomEntities();
+    }
 
     protected void fillMaps(E entity, T dlentity) {
         this.entity2dlentity.put(entity, dlentity);
         this.dlentity2entity.put(dlentity, entity);
     }
 
-    protected OWLEntityTranslator(ExpressionManager em, OWLDataFactory df,
-            TranslationMachinery tr) {
-        this.em = em;
-        this.df = df;
-        this.tr = tr;
+    protected void fillTopAndBottomEntities() {
         E topEntity = this.getTopEntity();
         if (topEntity != null) {
             this.fillMaps(topEntity, this.getTopEntityPointer());
@@ -52,7 +58,7 @@ abstract class OWLEntityTranslator<E extends OWLObject, T extends Entity>
     }
 
     public E getEntityFromPointer(T pointer) {
-        return this.dlentity2entity.get(pointer);
+        return verifyNotNull(this.dlentity2entity.get(pointer), pointer+" does not have a correct reverse mapping");
     }
 
     public T getPointerFromEntity(E entity) {
@@ -63,33 +69,29 @@ abstract class OWLEntityTranslator<E extends OWLObject, T extends Entity>
         return pointer;
     }
 
-    public Node<E> node(Collection<T> pointers) {
-        DefaultNode<E> node = this.createDefaultNode();
-        for (T pointer : pointers) {
-            node.add(this.getEntityFromPointer(pointer));
-        }
-        return node;
+    public Node<E> node(Stream<T> pointers) {
+        return createDefaultNode(pointers.map(this::getEntityFromPointer));
     }
 
-    public NodeSet<E> nodeSet(Collection<Collection<T>> pointers) {
-        DefaultNodeSet<E> nodeSet = this.createDefaultNodeSet();
-        for (Collection<T> pointerArray : pointers) {
-            nodeSet.addNode(this.node(pointerArray));
-        }
-        return nodeSet;
+    public NodeSet<E> nodeSet(Stream<Collection<T>> pointers) {
+        return createDefaultNodeSet(pointers.map(p -> node(p.stream())));
     }
 
-    protected abstract DefaultNode<E> createDefaultNode();
+    protected abstract DefaultNode<E> createDefaultNode(Stream<E> stream);
 
-    protected abstract DefaultNodeSet<E> createDefaultNodeSet();
+    protected abstract DefaultNodeSet<E> createDefaultNodeSet(Stream<Node<E>> stream);
 
+    @Nullable
     protected abstract T getTopEntityPointer();
 
+    @Nullable
     protected abstract T getBottomEntityPointer();
 
     protected abstract T createPointerForEntity(E entity);
 
+    @Nullable
     protected abstract E getTopEntity();
 
+    @Nullable
     protected abstract E getBottomEntity();
 }

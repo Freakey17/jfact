@@ -2,6 +2,8 @@ package uk.ac.manchester.cs.jfact.kernel;
 
 import java.io.Serializable;
 
+import javax.annotation.Nullable;
+
 import conformance.PortedFrom;
 
 /* This file is part of the JFact DL reasoner
@@ -13,18 +15,16 @@ import conformance.PortedFrom;
 @PortedFrom(file = "mergableLabel.h", name = "mergableLabel")
 public class MergableLabel implements Serializable {
 
-    private static final long serialVersionUID = 11000L;
     /** sample for all equivalent labels */
-    @PortedFrom(file = "mergableLabel.h", name = "pSample")
-    private MergableLabel pSample;
+    @PortedFrom(file = "mergableLabel.h", name = "pSample") private MergableLabel pSample;
 
-    /** default constructor */
+    /** Default constructor. */
     public MergableLabel() {
         pSample = this;
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (obj == null) {
             return false;
         }
@@ -33,7 +33,7 @@ public class MergableLabel implements Serializable {
         }
         if (obj instanceof MergableLabel) {
             MergableLabel p = (MergableLabel) obj;
-            return pSample.equals(p.pSample);
+            return pSample == p.pSample;
         }
         return false;
     }
@@ -56,7 +56,7 @@ public class MergableLabel implements Serializable {
     public void merge(MergableLabel p) {
         MergableLabel sample = p.resolve();
         resolve();
-        if (!pSample.equals(sample)) {
+        if (pSample != sample) {
             pSample.pSample = sample;
         }
     }
@@ -68,9 +68,20 @@ public class MergableLabel implements Serializable {
      */
     @PortedFrom(file = "mergableLabel.h", name = "resolve")
     public MergableLabel resolve() {
-        // check if current node is itself sample
-        if (!isSample()) {
-            pSample = pSample.resolve();
+        if (isSample()) {
+            return this;
+        }
+        MergableLabel test = this;
+        MergableLabel rootSample = pSample;
+        while (!test.isSample()) {
+            test = test.pSample;
+        }
+        pSample = test;
+        // all elements from rootSample to the sample resolve topSample
+        while (rootSample != pSample) {
+            test = rootSample;
+            rootSample = rootSample.pSample;
+            test.pSample = pSample;
         }
         return pSample;
     }
@@ -78,6 +89,6 @@ public class MergableLabel implements Serializable {
     /** @return is given lable a sample label */
     @PortedFrom(file = "mergableLabel.h", name = "isSample")
     public boolean isSample() {
-        return pSample.equals(this);
+        return pSample == this;
     }
 }

@@ -7,50 +7,38 @@ package uk.ac.manchester.cs.jfact.kernel;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.util.EnumSet;
 
+import javax.annotation.Nonnull;
+
 /** different Concept Expression tags */
 public enum DagTag {
-    /** illegal entry */
-    dtBad("bad-tag"),
-    /** operations */
-    dtTop("*TOP*"),
-    /** operations */
-    dtAnd("and"),
-    /** operations */
-    dtCollection("collection"),
-    /** operations */
-    dtForall("all"),
-    /** operations */
-    dtLE("at-most"),
-    /** \neg\exists R.Self */
-    dtIrr("irreflexive"),
-    /** aux vertex with Projection FROM the current node */
-    dtProj("projection"),
-    /** NN-rule was applied */
-    dtNN("NN-stopper"),
+    //@formatter:off
+    /** illegal entry */                                    BAD           ("bad-tag"),
+    /** operations */                                       TOP           ("*TOP*"),
+    /** operations */                                       AND           ("and"),
+    /** operations */                                       COLLECTION    ("collection"),
+    /** operations */                                       FORALL        ("all"),
+    /** operations */                                       LE            ("at-most"),
+    /** \neg\exists R.Self */                               IRR           ("irreflexive"),
+    /** aux vertex with Projection FROM the current node */ PROJ          ("projection"),
+    /** NN-rule was applied */                              NN            ("NN-stopper"),
     // ID's
-    /** primitive concept */
-    dtPConcept("primconcept"),
-    /** non-primitive concept */
-    dtNConcept("concept"),
-    /** primitive singleton */
-    dtPSingleton("prim-singleton"),
-    /** non-primitive singleton */
-    dtNSingleton("singleton"),
-    /** datatype */
-    dtDataType("data-type"),
-    /** data value */
-    dtDataValue("data-value"),
-    /** data expression */
-    dtDataExpr("data-expr"),
-    /** choose */
-    dtChoose("choose"),
-    /** split concept */
-    dtSplitConcept("split-concept");
+    /** primitive concept */                                PCONCEPT      ("primconcept"),
+    /** non-primitive concept */                            NCONCEPT      ("concept"),
+    /** primitive singleton */                              PSINGLETON    ("prim-singleton"),
+    /** non-primitive singleton */                          NSINGLETON    ("singleton"),
+    /** datatype */                                         DATATYPE      ("data-type"),
+    /** data value */                                       DATAVALUE     ("data-value"),
+    /** data expression */                                  DATAEXPR      ("data-expr"),
+    /** choose */                                           CHOOSE        ("choose");
+    //@formatter:on
+    private static final EnumSet<DagTag> TRUE = EnumSet.of(DATATYPE, DATAVALUE, DATAEXPR, NN, BAD, TOP, CHOOSE);
+    private static final EnumSet<DagTag> NotPos = EnumSet.of(PCONCEPT, PSINGLETON, COLLECTION, PROJ);
+    @Nonnull private final String name;
+    private static final EnumSet<DagTag> complexConceptsEnumSet = EnumSet.of(FORALL, LE, IRR, NN, CHOOSE);
 
-    private static final EnumSet<DagTag> TRUE = EnumSet.of(dtDataType,
-            dtDataValue, dtDataExpr, dtNN, dtBad, dtTop, dtChoose);
-    private static final EnumSet<DagTag> NotPos = EnumSet.of(dtPConcept,
-            dtPSingleton, dtCollection, dtProj);
+    private DagTag(String s) {
+        name = s;
+    }
 
     /**
      * @param pos
@@ -66,12 +54,6 @@ public enum DagTag {
             return !pos;
         }
         return false;
-    }
-
-    private final String name;
-
-    private DagTag(String s) {
-        name = s;
     }
 
     /** @return name */
@@ -90,7 +72,7 @@ public enum DagTag {
      *         entity
      */
     public boolean isPNameTag() {
-        return this == DagTag.dtPConcept || this == DagTag.dtPSingleton;
+        return this == PCONCEPT || this == PSINGLETON;
     }
 
     /**
@@ -98,17 +80,13 @@ public enum DagTag {
      *         entity
      */
     public boolean isNNameTag() {
-        return this == DagTag.dtNConcept || this == DagTag.dtNSingleton;
+        return this == NCONCEPT || this == NSINGLETON;
     }
 
     /** @return check whether given DagTag is a named concept-like entity */
     public boolean isCNameTag() {
         return isPNameTag() || isNNameTag();
     }
-
-    private static final EnumSet<DagTag> complexConceptsEnumSet = EnumSet.of(
-            DagTag.dtForall, DagTag.dtLE, DagTag.dtIrr, DagTag.dtNN,
-            DagTag.dtChoose);
 
     /** @return true iff TAG represents complex concept */
     public boolean isComplexConcept() {

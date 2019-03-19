@@ -7,25 +7,16 @@ package uk.ac.manchester.cs.jfact.datatypes;
  You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA*/
 import java.util.Collection;
 
-import org.semanticweb.owlapi.model.IRI;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
-class DatatypeExpressionImpl<O extends Comparable<O>> extends
-        ABSTRACT_DATATYPE<O> implements DatatypeExpression<O> {
+class DatatypeExpressionImpl<O extends Comparable<O>> extends AbstractDatatype<O> implements DatatypeExpression<O> {
 
-    private static final long serialVersionUID = 11000L;
-    // TODO handle all value space restrictions in the delegations
-    private final Datatype<O> host;
+    @Nonnull private final Datatype<O> host;
 
     public DatatypeExpressionImpl(Datatype<O> b) {
-        super(
-                IRI.create(b.getDatatypeIRI() + "_"
-                        + DatatypeFactory.getIndex()), b.getFacets());
-        if (b.isExpression()) {
-            this.host = b.asExpression().getHostType();
-        } else {
-            this.host = b;
-        }
-        ancestors = Utils.generateAncestors(this.host);
+        super(DatatypeFactory.getIndex(b.getDatatypeIRI() + "_"), b.getFacets(), Utils.generateAncestors(b.host()));
+        this.host = b.host();
         knownNumericFacetValues.putAll(b.getKnownNumericFacetValues());
         knownNonNumericFacetValues.putAll(b.getKnownNonNumericFacetValues());
     }
@@ -71,16 +62,14 @@ class DatatypeExpressionImpl<O extends Comparable<O>> extends
     }
 
     @Override
-    public DatatypeExpression<O> addNumericFacet(Facet f, Comparable<?> value) {
+    public DatatypeExpression<O> addNumericFacet(Facet f, @Nullable Comparable<?> value) {
         if (!facets.contains(f)) {
-            throw new IllegalArgumentException("Facet " + f
-                    + " not allowed tor datatype " + this.getHostType());
+            throw new IllegalArgumentException("Facet " + f + " not allowed tor datatype " + this.getHostType());
         }
         if (value == null) {
             throw new IllegalArgumentException("Value cannot be null");
         }
-        DatatypeExpressionImpl<O> toReturn = new DatatypeExpressionImpl<O>(
-                this.host);
+        DatatypeExpressionImpl<O> toReturn = new DatatypeExpressionImpl<>(this.host);
         toReturn.knownNumericFacetValues.putAll(knownNumericFacetValues);
         toReturn.knownNonNumericFacetValues.putAll(knownNonNumericFacetValues);
         // cannot have noth min/maxInclusive and min/maxExclusive values, so
@@ -98,17 +87,14 @@ class DatatypeExpressionImpl<O extends Comparable<O>> extends
     }
 
     @Override
-    public DatatypeExpression<O>
-            addNonNumericFacet(Facet f, Comparable<?> value) {
+    public DatatypeExpression<O> addNonNumericFacet(Facet f, @Nullable Comparable<?> value) {
         if (!facets.contains(f)) {
-            throw new IllegalArgumentException("Facet " + f
-                    + " not allowed tor datatype " + this.getHostType());
+            throw new IllegalArgumentException("Facet " + f + " not allowed tor datatype " + this.getHostType());
         }
         if (value == null) {
             throw new IllegalArgumentException("Value cannot be null");
         }
-        DatatypeExpressionImpl<O> toReturn = new DatatypeExpressionImpl<O>(
-                this.host);
+        DatatypeExpressionImpl<O> toReturn = new DatatypeExpressionImpl<>(this.host);
         toReturn.knownNumericFacetValues.putAll(knownNumericFacetValues);
         toReturn.knownNonNumericFacetValues.putAll(knownNonNumericFacetValues);
         toReturn.knownNonNumericFacetValues.put(f, value);
@@ -168,22 +154,20 @@ class DatatypeExpressionImpl<O extends Comparable<O>> extends
 
     @Override
     public String toString() {
-        return this.getClass().getName() + '(' + this.host.toString()
-                + "(extra facets:" + knownNumericFacetValues + "))";
+        return this.getClass().getSimpleName() + '(' + this.host.toString() + "(extra facets:" + knownNumericFacetValues
+            + "))";
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (super.equals(obj)) {
             return true;
         }
         if (obj instanceof DatatypeExpression) {
             DatatypeExpression<?> datatypeExpression = (DatatypeExpression<?>) obj;
             return this.host.equals(datatypeExpression.getHostType())
-                    && knownNumericFacetValues.equals(datatypeExpression
-                            .getKnownNumericFacetValues())
-                    && knownNonNumericFacetValues.equals(datatypeExpression
-                            .getKnownNonNumericFacetValues());
+                && knownNumericFacetValues.equals(datatypeExpression.getKnownNumericFacetValues())
+                && knownNonNumericFacetValues.equals(datatypeExpression.getKnownNonNumericFacetValues());
         }
         return false;
     }
